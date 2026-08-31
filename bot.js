@@ -58,6 +58,30 @@ const SESSION_TIMEOUT_MS =
 
 const MAX_TEXT_CHARS = 250000;
 
+const REMINDER_TIME =
+    process.env.REMINDER_TIME || "08:00";
+
+const REMINDER_FILE =
+    process.env.REMINDER_FILE || "reminders.md";
+
+const REMINDER_DISABLED_VALUES =
+    new Set([
+        "0",
+        "false",
+        "no",
+        "off",
+        "disabled"
+    ]);
+
+const REMINDER_CHECK_INTERVAL_MS =
+    60 * 1000;
+
+const REMINDER_SENTINEL =
+    "NO_REMINDERS";
+
+const TELEGRAM_MESSAGE_CHUNK_SIZE =
+    3900;
+
 if (!BOT_TOKEN) {
     throw new Error(
         "TELEGRAM_BOT_TOKEN is not configured"
@@ -88,6 +112,14 @@ function userNameFor(userId) {
     return (
         TELEGRAM_USER_NAMES.get(userId) ||
         `Telegram user ${userId}`
+    );
+}
+
+function allowedUserIds() {
+    return Array.from(
+        ALLOWED_USER_IDS
+    ).sort(
+        (a, b) => a - b
     );
 }
 
@@ -694,6 +726,377 @@ personal information, preserve who the information belongs to.
             }
         );
     }
+}
+
+
+// ---------------------------------------------------------------------------
+// Reminders
+// ---------------------------------------------------------------------------
+
+function parseReminderTime(value) {
+    const trimmed =
+        String(value || "").trim();
+
+    if (
+        REMINDER_DISABLED_VALUES.has(
+            trimmed.toLowerCase()
+        )
+    ) {
+        return null;
+    }
+
+    const match =
+        trimmed.match(
+            /^([01]?\d|2[0-3]):([0-5]\d)$/
+        );
+
+    if (!match) {
+        throw new Error(
+            "REMINDER_TIME must be HH:MM in 24-hour local server time, or off"
+        );
+    }
+
+    return {
+        hour: Number(match[1]),
+        minute: Number(match[2])
+    };
+}
+
+function localDateKey(date) {
+    const year =
+        date.getFullYear();
+
+    const month =
+        String(
+            date.getMonth() + 1
+        ).padStart(
+            2,
+            "0"
+        );
+
+    const day =
+        String(
+            date.getDate()
+        ).padStart(
+            2,
+            "0"
+        );
+
+    return `${year}-${month}-${day}`;
+}
+
+function shouldRunReminders(
+    now,
+    schedule,
+    lastRunDate
+) {
+    if (!schedule) {
+        return false;
+    }
+
+    const currentMinutes =
+        now.getHours() * 60 +
+        now.getMinutes();
+
+    const scheduledMinutes =
+        schedule.hour * 60 +
+        schedule.minute;
+
+    if (currentMinutes < scheduledMinutes) {
+        return false;
+    }
+
+    return localDateKey(now) !== lastRunDate;
+}
+
+async function runReminderCodex(userId) {
+    const tempDir =
+        await fs.mkdtemp(
+            path.join(
+                os.tmpdir(),
+                "knowledge-reminder-"
+            )
+        );
+
+    const outputFile =
+        path.join(
+            tempDir,
+            "response.txt"
+        );
+
+    const jsonFile =
+        path.join(
+            tempDir,
+            "events.jsonl"
+        );
+
+    const currentUserName =
+        userNameFor(userId);
+
+    const today =
+        localDateKey(
+            new Date()
+        );
+
+    const prompt = `
+SYSTEM FOR THIS TURN:
+
+This is the scheduled daily reminder check for the personal knowledge
+base. This is a READ-only request.
+
+Today is ${today}. Use the server's local date as authoritative for
+date-based reminders.
+
+Current recipient:
+
+Name: ${currentUserName}
+Telegram user ID: ${userId}
+
+Read the reminder source in the knowledge base. The expected reminder
+file is:
+
+${REMINDER_FILE}
+
+If that exact file is not present, search for a clearly named reminders
+file such as reminders.md, reminder.md, Reminders.md, or a reminders
+file in a relevant notes directory.
+
+Send a reminder only when the reminder file indicates something should
+be delivered today or continually/daily. Date-specific reminders should
+only be delivered on their specified date unless the file says they
+should continue. Recurring or continual reminders should be delivered
+whenever they are currently active.
+
+If no reminders are due for this recipient today, respond with exactly:
+
+${REMINDER_SENTINEL}
+
+If reminders are due, write the exact Telegram message to send. Keep it
+concise and practical.
+
+Start with one short, friendly wake-up line addressed to the recipient
+by name. Make this line feel fresh each day: light chit-chat, a small
+observation, or a practical nudge based on today's due reminders is
+good. You may mention weather, travel, deadlines, or preparation only
+when that information is present in the knowledge base or the reminder
+text. Do not invent real-world conditions, plans, or facts. Avoid being
+overly cute or verbose.
+
+After the wake-up line, present the due reminders as a clear list.
+
+Do not mention Markdown file paths unless the reminder text itself
+requires it.
+
+Do not create, edit, delete, rename, or otherwise modify any files.
+`;
+
+    try {
+        await new Promise(
+            (resolve, reject) => {
+                const child = spawn(
+                    "/opt/knowledge-agent/run-codex.sh",
+                    [
+                        outputFile,
+                        "",
+                        "",
+                        jsonFile,
+                        "READ"
+                    ],
+                    {
+                        cwd: REPO,
+                        env: process.env,
+                        stdio: [
+                            "pipe",
+                            "pipe",
+                            "pipe"
+                        ]
+                    }
+                );
+
+                let stderr = "";
+
+                child.stdout.on(
+                    "data",
+                    data => {
+                        const text =
+                            data.toString().trim();
+
+                        if (text) {
+                            console.log(text);
+                        }
+                    }
+                );
+
+                child.stderr.on(
+                    "data",
+                    data => {
+                        stderr +=
+                            data.toString();
+                    }
+                );
+
+                child.on(
+                    "error",
+                    reject
+                );
+
+                child.on(
+                    "close",
+                    code => {
+                        if (code === 0) {
+                            resolve();
+                        } else {
+                            reject(
+                                new Error(
+                                    `Reminder Codex wrapper exited with code ${code}\n${stderr}`
+                                )
+                            );
+                        }
+                    }
+                );
+
+                child.stdin.write(prompt);
+                child.stdin.end();
+            }
+        );
+
+        return (
+            await fs.readFile(
+                outputFile,
+                "utf8"
+            )
+        ).trim();
+
+    } finally {
+        await fs.rm(
+            tempDir,
+            {
+                recursive: true,
+                force: true
+            }
+        );
+    }
+}
+
+async function sendDailyReminders() {
+    console.log(
+        `${new Date().toISOString()} scheduled reminder check starting`
+    );
+
+    for (const userId of allowedUserIds()) {
+        try {
+            const message =
+                await runReminderCodex(userId);
+
+            const trimmedMessage =
+                message.trim();
+
+            if (
+                !trimmedMessage ||
+                trimmedMessage.toUpperCase() === REMINDER_SENTINEL
+            ) {
+                console.log(
+                    `${new Date().toISOString()} ` +
+                    `no reminders due for Telegram user ${userId}`
+                );
+
+                continue;
+            }
+
+            await sendTelegramMessage(
+                userId,
+                trimmedMessage
+            );
+
+            console.log(
+                `${new Date().toISOString()} ` +
+                `sent reminder to Telegram user ${userId}`
+            );
+
+        } catch (err) {
+            console.error(
+                `Reminder check failed for Telegram user ${userId}:`,
+                err
+            );
+        }
+    }
+
+    console.log(
+        `${new Date().toISOString()} scheduled reminder check complete`
+    );
+}
+
+async function sendTelegramMessage(chatId, message) {
+    for (
+        let start = 0;
+        start < message.length;
+        start += TELEGRAM_MESSAGE_CHUNK_SIZE
+    ) {
+        await bot.api.sendMessage(
+            chatId,
+            message.slice(
+                start,
+                start + TELEGRAM_MESSAGE_CHUNK_SIZE
+            )
+        );
+    }
+}
+
+function startReminderScheduler() {
+    const schedule =
+        parseReminderTime(
+            REMINDER_TIME
+        );
+
+    if (!schedule) {
+        console.log(
+            "Scheduled reminders are disabled."
+        );
+
+        return;
+    }
+
+    let lastRunDate = null;
+
+    console.log(
+        `Scheduled reminders enabled for ${REMINDER_TIME} local server time.`
+    );
+
+    const tick = () => {
+        const now =
+            new Date();
+
+        if (
+            !shouldRunReminders(
+                now,
+                schedule,
+                lastRunDate
+            )
+        ) {
+            return;
+        }
+
+        lastRunDate =
+            localDateKey(now);
+
+        enqueue(
+            sendDailyReminders
+        ).catch(
+            err => {
+                console.error(
+                    "Scheduled reminder run failed:",
+                    err
+                );
+            }
+        );
+    };
+
+    tick();
+
+    setInterval(
+        tick,
+        REMINDER_CHECK_INTERVAL_MS
+    );
 }
 
 
@@ -1476,5 +1879,7 @@ await bot.api.setMyCommands([
 console.log(
     "Knowledge Telegram bot starting..."
 );
+
+startReminderScheduler();
 
 bot.start();

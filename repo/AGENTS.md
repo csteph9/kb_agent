@@ -133,6 +133,31 @@ removed from the inbox after it has been successfully preserved
 elsewhere in the knowledge base.
 
 
+## Reminders
+
+Use `reminders.md` for reminders unless the user specifies a different
+reminder file.
+
+When adding or updating reminders:
+
+1. Search for an existing reminder before creating a duplicate.
+2. Preserve the user's requested timing clearly.
+3. Use ISO dates in the form YYYY-MM-DD for date-specific reminders.
+4. Mark ongoing reminders as recurring, continual, daily, weekly, monthly, or
+   with another clear cadence.
+5. Include enough context for the scheduled Telegram reminder check to decide
+   whether the reminder is due today.
+6. Include useful preparation context when known, such as what the user should
+   bring, review, book, buy, or watch for.
+7. Remove or mark completed reminders only when the user asks or the reminder
+   explicitly says it should happen once and has already been fulfilled.
+
+The scheduled reminder check reads the reminder file and sends only reminders
+that are due today or currently active as recurring/continual reminders. It
+may add a brief personalized wake-up line before the reminder list, but it
+should not invent real-world facts such as weather or travel conditions.
+
+
 ## Internet resources
 
 When the user asks to read, refresh, import, or process information from an HTTP or HTTPS URL:
