@@ -64,6 +64,22 @@ const REMINDER_TIME =
 const REMINDER_FILE =
     process.env.REMINDER_FILE || "reminders.md";
 
+const REMINDER_WEATHER_LOCATION =
+    process.env.REMINDER_WEATHER_LOCATION || "";
+
+const REMINDER_NEWS_FEEDS =
+    (
+        process.env.REMINDER_NEWS_FEEDS ||
+        [
+            "https://feeds.bbci.co.uk/news/rss.xml",
+            "https://feeds.npr.org/1001/rss.xml",
+            "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+        ].join(",")
+    )
+        .split(",")
+        .map(feed => feed.trim())
+        .filter(Boolean);
+
 const REMINDER_DISABLED_VALUES =
     new Set([
         "0",
@@ -835,11 +851,22 @@ async function runReminderCodex(userId) {
             new Date()
         );
 
+    const weatherLocation =
+        REMINDER_WEATHER_LOCATION.trim();
+
+    const newsFeeds =
+        REMINDER_NEWS_FEEDS.length
+            ? REMINDER_NEWS_FEEDS
+                  .map(feed => `- ${feed}`)
+                  .join("\n")
+            : "- No configured news feeds";
+
     const prompt = `
 SYSTEM FOR THIS TURN:
 
 This is the scheduled daily reminder check for the personal knowledge
-base. This is a READ-only request.
+base. This is a READ-only request. It should produce the daily morning
+Telegram ping for the recipient.
 
 Today is ${today}. Use the server's local date as authoritative for
 date-based reminders.
@@ -848,6 +875,41 @@ Current recipient:
 
 Name: ${currentUserName}
 Telegram user ID: ${userId}
+
+Daily weather:
+
+Include a short weather line for the recipient when a location is
+available. The configured weather location is:
+
+${weatherLocation || "[not configured]"}
+
+If the configured weather location is blank, search the knowledge base
+for a city/state location for this recipient. Use only city/state level
+location. Do not use or expose street addresses, precise coordinates, or
+other sensitive location details.
+
+If you have a location, retrieve today's weather using the local HTTP
+retrieval bridge:
+
+/opt/knowledge-agent/http-puller.js "https://wttr.in/<URL-ENCODED-LOCATION>?format=j1"
+
+Use the retrieved weather data to summarize today's conditions briefly.
+If weather retrieval fails or no location is available, omit the weather
+line rather than inventing weather.
+
+Top news:
+
+Retrieve current headlines from these configured public RSS feeds using
+the local HTTP retrieval bridge:
+
+${newsFeeds}
+
+Parse the actual feed entries and include the top 5 news items total,
+deduplicated across feeds. Prefer broadly important/top headlines. Each
+item should include the source name and a short title. Include links
+only if they fit cleanly in the Telegram message. If news retrieval
+fails, say briefly that news could not be refreshed today; do not invent
+headlines.
 
 Read the reminder source in the knowledge base. The expected reminder
 file is:
@@ -887,7 +949,7 @@ Include reminders when:
 
 If no reminders match those rules, do not add a reminder section, do
 not say "no reminders", and do not mention the reminder file. Send only
-the short wake-up/check-in line.
+the short wake-up/check-in line plus any available weather/news.
 
 Do not mention Markdown file paths unless the reminder text itself
 requires it.

@@ -581,6 +581,8 @@ TELEGRAM_ALLOWED_USER_IDS=123456789
 TELEGRAM_USER_NAMES=123456789:YourName
 REMINDER_TIME=08:00
 REMINDER_FILE=reminders.md
+REMINDER_WEATHER_LOCATION=San Francisco, CA
+REMINDER_NEWS_FEEDS=https://feeds.bbci.co.uk/news/rss.xml,https://feeds.npr.org/1001/rss.xml,https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml
 ```
 
 For multiple people:
@@ -602,12 +604,23 @@ disable scheduled reminders.
 to read in the knowledge repository. The default is `reminders.md`.
 At the configured time, the agent asks Codex to read that file and send
 a brief personalized wake-up/check-in message to every configured
-`TELEGRAM_ALLOWED_USER_IDS` user. If reminders are due, the message also
-includes a reminder list. Date-specific reminders are included 7 days
-before, 2 days before, and on the day of the reminder. Recurring or
-continual reminders are included whenever currently active. If no
-reminders match those rules, the agent sends only the short check-in
-line.
+`TELEGRAM_ALLOWED_USER_IDS` user. The message includes daily weather
+when a location is available and the top five current news items from
+the configured public RSS feeds.
+
+`REMINDER_WEATHER_LOCATION` can be set to a city/state location such as
+`San Francisco, CA`. If it is blank, the scheduled check may infer a
+city/state location from the knowledge base for the recipient. It should
+not use or expose more precise location details.
+
+`REMINDER_NEWS_FEEDS` is a comma-separated list of public RSS feed URLs.
+The default uses BBC, NPR, and The New York Times headline feeds.
+
+If reminders are due, the message also includes a reminder list.
+Date-specific reminders are included 7 days before, 2 days before, and
+on the day of the reminder. Recurring or continual reminders are
+included whenever currently active. If no reminders match those rules,
+the agent sends the check-in, weather if available, and news only.
 
 Protect the file:
 

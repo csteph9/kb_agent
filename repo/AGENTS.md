@@ -158,9 +158,15 @@ When adding or updating reminders:
 The scheduled reminder check reads the reminder file and sends only reminders
 that are 7 days away, 2 days away, due today, or currently active as
 recurring/continual reminders. It should always send a brief personalized
-wake-up/check-in line, but it should not invent real-world facts such as
-weather or travel conditions. If no reminders match the timing rules, omit the
-reminder list entirely.
+wake-up/check-in line. It may include daily weather for the recipient and top
+current news headlines when those can be retrieved from configured public
+sources. It should not invent real-world facts such as weather, travel
+conditions, or news headlines. If no reminders match the timing rules, omit
+the reminder list entirely.
+
+Weather and news retrieved for the scheduled ping are temporary context for
+that message. Do not store daily weather or news headlines in the knowledge
+base unless the user explicitly asks.
 
 When new information is posted with any future date, treat that future-dated
 item as reminder-worthy by default. Preserve the information in its appropriate
