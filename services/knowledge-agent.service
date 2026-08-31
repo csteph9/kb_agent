@@ -1,0 +1,24 @@
+[Unit]
+Description=Telegram Knowledge Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+User=knowledge
+Group=knowledge
+
+WorkingDirectory=/opt/knowledge-agent
+EnvironmentFile=/opt/knowledge-agent/.env
+
+Environment=HOME=/home/knowledge
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+ExecStart=/usr/bin/node /opt/knowledge-agent/bot.js
+
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

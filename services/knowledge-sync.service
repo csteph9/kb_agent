@@ -1,0 +1,15 @@
+[Unit]
+Description=Synchronize Knowledge Base with GitHub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+
+User=knowledge
+Group=knowledge
+
+Environment=HOME=/home/knowledge
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+ExecStart=/opt/knowledge-agent/sync.sh

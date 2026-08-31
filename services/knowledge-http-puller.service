@@ -1,0 +1,15 @@
+[Unit]
+Description=Knowledge Agent HTTP Puller
+
+[Service]
+Type=oneshot
+User=knowledge
+Group=knowledge
+
+Environment=HOME=/home/knowledge
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+ExecStartPre=/usr/bin/mkdir -p /tmp/knowledge-http/requests
+ExecStartPre=/usr/bin/mkdir -p /tmp/knowledge-http/responses
+
+ExecStart=/usr/bin/node /opt/knowledge-agent/http-puller-service.js

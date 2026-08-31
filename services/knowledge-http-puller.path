@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for Knowledge Agent HTTP requests
+
+[Path]
+PathExistsGlob=/tmp/knowledge-http/requests/*.request
+Unit=knowledge-http-puller.service
+
+[Install]
+WantedBy=multi-user.target
