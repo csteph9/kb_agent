@@ -36,7 +36,9 @@ When asked to remember, record, add, or save information:
 3. Update an existing file when appropriate.
 4. Create a new file only when necessary.
 5. Include the date when useful.
-6. Preserve context necessary to understand the information later.
+6. If the information includes a future date, also add or update an entry in
+   `reminders.md` so the scheduled Telegram reminder check can surface it.
+7. Preserve context necessary to understand the information later.
 
 If the appropriate location is unclear, place the information in `inbox/`
 rather than inventing an arbitrary structure.
@@ -159,6 +161,13 @@ recurring/continual reminders. It should always send a brief personalized
 wake-up/check-in line, but it should not invent real-world facts such as
 weather or travel conditions. If no reminders match the timing rules, omit the
 reminder list entirely.
+
+When new information is posted with any future date, treat that future-dated
+item as reminder-worthy by default. Preserve the information in its appropriate
+knowledge file, and also add or update a concise `reminders.md` entry with the
+future date, the thing to remember, and any useful preparation context. Do not
+create a reminder for past dates or ordinary historical/source dates unless the
+user asks.
 
 
 ## Internet resources
