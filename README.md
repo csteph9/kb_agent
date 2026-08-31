@@ -1,3 +1,170 @@
+# Executive Summary
+
+This system is a **personal, AI-native knowledge system** designed to
+create durable memory across a person's work, projects, decisions,
+research, relationships, travel, interests, and everyday life.
+
+At its core, the system separates **knowledge** from the **AI used to
+interact with it**.
+
+The knowledge itself lives in ordinary Markdown files stored in a
+private Git repository. There is no proprietary database, vector
+database, or application-specific storage format. The repository can be
+opened in VS Code, edited by hand, searched with standard tools, used by
+Codex or other AI agents, backed up normally, and moved anywhere.
+
+The AI acts as the interface to that knowledge.
+
+Instead of simply storing notes, the agent can read across the
+repository, find existing information before creating something new,
+update prior knowledge when circumstances change, preserve useful
+history, connect related information, answer questions from accumulated
+context, and organize new information into the appropriate place.
+
+> **The repository becomes durable memory while the AI becomes the
+> interface to that memory.**
+
+## How It Works
+
+The system combines several simple, replaceable components:
+
+-   **Markdown** provides the permanent, human-readable knowledge
+    format.
+-   **Git** provides version history, auditability, synchronization,
+    conflict management, and recovery.
+-   **GitHub** provides private remote storage and synchronization
+    between devices.
+-   **Codex** provides the reasoning layer that reads, interprets,
+    organizes, and modifies the knowledge.
+-   **Telegram** provides a convenient conversational interface from a
+    phone or other device.
+-   **A small Linux server** provides an always-on copy of the
+    repository and runs the Telegram agent, synchronization services,
+    and supporting tools.
+
+A user can interact with the same knowledge in very different ways.
+
+From a desktop, the repository can be opened directly in VS Code, Codex,
+Vim, or another editor. From a phone, the same knowledge can be queried
+and updated conversationally through Telegram. Changes made through
+either interface ultimately become normal Git commits in the same
+repository.
+
+## More Than AI Note-Taking
+
+This system is not designed merely to save conversations or accumulate
+disconnected notes.
+
+The agent is expected to maintain the repository as an evolving body of
+knowledge.
+
+It can distinguish between a new fact and an update to an existing fact,
+search for related material before creating another file, incorporate
+information from documents and images, preserve historical context when
+something changes, and synthesize information spread across many
+different notes.
+
+Over time, this allows the repository to become a longitudinal record
+rather than a collection of isolated AI conversations.
+
+The AI can reason across information accumulated over months or years,
+while the underlying source material remains directly inspectable and
+editable by a human.
+
+## Controlled AI Writes
+
+The system treats AI access to durable knowledge as a controlled
+transaction rather than giving an agent unrestricted access to a
+directory.
+
+Requests are classified as either **READ** or **WRITE** operations.
+
+READ operations use the local knowledge repository without intentionally
+modifying it.
+
+WRITE operations synchronize the repository, allow Codex to make the
+requested changes, commit those changes to Git, reconcile upstream
+changes when necessary, and push the result back to the private remote
+repository.
+
+Shared locking prevents multiple processes from modifying the repository
+simultaneously, while Git provides a complete history of what changed
+and a straightforward recovery mechanism if a change is ever
+undesirable.
+
+This makes the AI powerful without making the underlying knowledge
+opaque.
+
+## Shared Knowledge, Individual Context
+
+The same knowledge base can be used by multiple authorized people.
+
+Each person can maintain an independent conversational session with the
+AI while contributing to and querying the same durable repository. The
+system supplies identity context to the agent so statements such as "my
+trip," "my project," or "remember that I..." can be associated with the
+person making the request.
+
+Conversational context is temporary.
+
+The Markdown repository is permanent.
+
+This distinction prevents the long-term usefulness of the system from
+depending on an indefinitely growing AI conversation.
+
+## Portable by Design
+
+One of the most important architectural principles is:
+
+> **The intelligence is replaceable while the knowledge is not.**
+
+Codex is the reasoning layer used by this implementation, but the
+repository does not depend on Codex-specific storage.
+
+A future version could use another hosted model, a local model, multiple
+specialized agents, a different mobile interface, or tools that do not
+yet exist. The accumulated knowledge would remain usable because its
+canonical representation is still ordinary Markdown.
+
+The same principle applies to Telegram. Telegram is a convenient
+interface, not the storage layer. GitHub is a convenient synchronization
+target, not a proprietary database.
+
+Individual components can therefore evolve without requiring the
+knowledge itself to be migrated into another platform.
+
+## Why This Becomes Powerful Over Time
+
+The value of the system increases as durable knowledge accumulates.
+
+A normal AI conversation begins with limited context and eventually
+disappears into conversation history. This system instead gives future
+AI sessions access to information deliberately accumulated over time.
+
+That creates the possibility of an AI that can understand ongoing
+projects, recall previous decisions, connect current research to older
+work, identify changes in plans, maintain context about people and
+organizations, and synthesize information that no single conversation
+ever contained.
+
+The resulting repository is a private, longitudinal dataset of the
+user's own knowledge and experiences---with human-readable source
+material, version history, portability, and direct ownership.
+
+The system is therefore better thought of not as an AI note-taking
+application, but as a:
+
+> **Persistent external memory for people, with AI acting as its
+> librarian, researcher, editor, and conversational interface.**
+
+The AI can change.
+
+The interfaces can change.
+
+The infrastructure can change.
+
+**The knowledge remains.**
+
 # Personal Knowledge Base (PKB)
 
 A self-hosted, AI-native personal knowledge base built from **Markdown +
