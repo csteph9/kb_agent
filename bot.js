@@ -76,9 +76,6 @@ const REMINDER_DISABLED_VALUES =
 const REMINDER_CHECK_INTERVAL_MS =
     60 * 1000;
 
-const REMINDER_SENTINEL =
-    "NO_REMINDERS";
-
 const TELEGRAM_MESSAGE_CHUNK_SIZE =
     3900;
 
@@ -867,22 +864,30 @@ only be delivered on their specified date unless the file says they
 should continue. Recurring or continual reminders should be delivered
 whenever they are currently active.
 
-If no reminders are due for this recipient today, respond with exactly:
-
-${REMINDER_SENTINEL}
-
-If reminders are due, write the exact Telegram message to send. Keep it
-concise and practical.
+Always write the exact Telegram message to send. Keep it concise and
+practical.
 
 Start with one short, friendly wake-up line addressed to the recipient
-by name. Make this line feel fresh each day: light chit-chat, a small
-observation, or a practical nudge based on today's due reminders is
-good. You may mention weather, travel, deadlines, or preparation only
-when that information is present in the knowledge base or the reminder
-text. Do not invent real-world conditions, plans, or facts. Avoid being
-overly cute or verbose.
+by name, and make it clear the knowledge agent is active. Make this
+line feel fresh each day: light chit-chat, a small observation, or a
+practical nudge based on reminders is good. You may mention weather,
+travel, deadlines, or preparation only when that information is present
+in the knowledge base or the reminder text. Do not invent real-world
+conditions, plans, or facts. Avoid being overly cute or verbose.
 
-After the wake-up line, present the due reminders as a clear list.
+After the wake-up line, present a reminder list only when at least one
+reminder should be included.
+
+Include reminders when:
+
+- A date-specific reminder is exactly 7 days away.
+- A date-specific reminder is exactly 2 days away.
+- A date-specific reminder is today.
+- A recurring or continual reminder is currently active.
+
+If no reminders match those rules, do not add a reminder section, do
+not say "no reminders", and do not mention the reminder file. Send only
+the short wake-up/check-in line.
 
 Do not mention Markdown file paths unless the reminder text itself
 requires it.
@@ -988,16 +993,10 @@ async function sendDailyReminders() {
             const message =
                 await runReminderCodex(userId);
 
-            const trimmedMessage =
-                message.trim();
-
-            if (
-                !trimmedMessage ||
-                trimmedMessage.toUpperCase() === REMINDER_SENTINEL
-            ) {
+            if (!message.trim()) {
                 console.log(
                     `${new Date().toISOString()} ` +
-                    `no reminders due for Telegram user ${userId}`
+                    `empty reminder message for Telegram user ${userId}`
                 );
 
                 continue;
@@ -1005,7 +1004,7 @@ async function sendDailyReminders() {
 
             await sendTelegramMessage(
                 userId,
-                trimmedMessage
+                message.trim()
             );
 
             console.log(

@@ -146,16 +146,19 @@ When adding or updating reminders:
 4. Mark ongoing reminders as recurring, continual, daily, weekly, monthly, or
    with another clear cadence.
 5. Include enough context for the scheduled Telegram reminder check to decide
-   whether the reminder is due today.
+   whether the reminder should be sent 7 days before, 2 days before, on the
+   day of, or as an active recurring/continual reminder.
 6. Include useful preparation context when known, such as what the user should
    bring, review, book, buy, or watch for.
 7. Remove or mark completed reminders only when the user asks or the reminder
    explicitly says it should happen once and has already been fulfilled.
 
 The scheduled reminder check reads the reminder file and sends only reminders
-that are due today or currently active as recurring/continual reminders. It
-may add a brief personalized wake-up line before the reminder list, but it
-should not invent real-world facts such as weather or travel conditions.
+that are 7 days away, 2 days away, due today, or currently active as
+recurring/continual reminders. It should always send a brief personalized
+wake-up/check-in line, but it should not invent real-world facts such as
+weather or travel conditions. If no reminders match the timing rules, omit the
+reminder list entirely.
 
 
 ## Internet resources

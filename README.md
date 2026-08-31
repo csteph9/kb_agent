@@ -600,12 +600,14 @@ disable scheduled reminders.
 
 `REMINDER_FILE` tells the scheduled reminder check which Markdown file
 to read in the knowledge repository. The default is `reminders.md`.
-At the configured time, the agent asks Codex to read that file, decide
-which reminders are due that day or are marked as continual/recurring,
-and send the resulting Telegram message to every configured
-`TELEGRAM_ALLOWED_USER_IDS` user. Reminder messages start with a brief,
-personalized wake-up line followed by the due reminder list. If no
-reminders are due, no message is sent.
+At the configured time, the agent asks Codex to read that file and send
+a brief personalized wake-up/check-in message to every configured
+`TELEGRAM_ALLOWED_USER_IDS` user. If reminders are due, the message also
+includes a reminder list. Date-specific reminders are included 7 days
+before, 2 days before, and on the day of the reminder. Recurring or
+continual reminders are included whenever currently active. If no
+reminders match those rules, the agent sends only the short check-in
+line.
 
 Protect the file:
 
