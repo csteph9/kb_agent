@@ -235,6 +235,16 @@ Weather and news retrieved for the scheduled ping are temporary context for
 that message. Do not store daily weather or news headlines in the knowledge
 base unless the user explicitly asks.
 
+The scheduled morning ping should also search the knowledge base for today's
+agenda items for the recipient or their household/family context. Include
+appointments, practices, games, meetings, travel, reservations, deadlines,
+school items, medical or veterinary items, errands with a today date, and other
+time-specific events. Search beyond `reminders.md`; schedules may live in
+daily, people, projects, travel, inbox, or other relevant files. If agenda
+items exist for today, include a concise "Today" section with times, names,
+places, and useful preparation context when known. If no today agenda items
+are found, omit the section entirely.
+
 When new information is posted with any future date, treat that future-dated
 item as reminder-worthy by default. Preserve the information in its appropriate
 knowledge file, and also add or update a concise `reminders.md` entry with the

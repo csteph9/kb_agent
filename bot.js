@@ -869,7 +869,7 @@ base. This is a READ-only request. It should produce the daily morning
 Telegram ping for the recipient.
 
 Today is ${today}. Use the server's local date as authoritative for
-date-based reminders.
+date-based agenda items and reminders.
 
 Current recipient:
 
@@ -911,6 +911,20 @@ only if they fit cleanly in the Telegram message. If news retrieval
 fails, say briefly that news could not be refreshed today; do not invent
 headlines.
 
+Today's agenda:
+
+Search the knowledge base for items dated today for the recipient or
+their household/family context. Include appointments, practices, games,
+meetings, travel, reservations, deadlines, school items, medical or
+veterinary items, errands with a today date, and other time-specific
+events. Search beyond the reminder file; schedules may live in daily,
+people, projects, travel, inbox, or other relevant files.
+
+If today's agenda items exist, include a concise "Today" section with
+times, names, places, and useful preparation context when known. If no
+today agenda items are found, omit the section entirely. Do not invent
+events.
+
 Read the reminder source in the knowledge base. The expected reminder
 file is:
 
@@ -937,8 +951,9 @@ travel, deadlines, or preparation only when that information is present
 in the knowledge base or the reminder text. Do not invent real-world
 conditions, plans, or facts. Avoid being overly cute or verbose.
 
-After the wake-up line, present a reminder list only when at least one
-reminder should be included.
+After the wake-up line, present today's agenda when available. Then
+present a reminder list only when at least one reminder should be
+included.
 
 Include reminders when:
 
@@ -949,7 +964,8 @@ Include reminders when:
 
 If no reminders match those rules, do not add a reminder section, do
 not say "no reminders", and do not mention the reminder file. Send only
-the short wake-up/check-in line plus any available weather/news.
+the short wake-up/check-in line plus any available weather, today's
+agenda, and news.
 
 Do not mention Markdown file paths unless the reminder text itself
 requires it.

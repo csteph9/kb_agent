@@ -632,7 +632,10 @@ At the configured time, the agent asks Codex to read that file and send
 a brief personalized wake-up/check-in message to every configured
 `TELEGRAM_ALLOWED_USER_IDS` user. The message includes daily weather
 when a location is available and the top five current news items from
-the configured public RSS feeds.
+the configured public RSS feeds. It also searches the KB for today's
+agenda items, including appointments, practices, games, meetings,
+travel, reservations, deadlines, school items, medical/veterinary items,
+and dated errands.
 
 `REMINDER_WEATHER_LOCATION` can be set to a city/state location such as
 `San Francisco, CA`. If it is blank, the scheduled check may infer a
@@ -646,7 +649,8 @@ If reminders are due, the message also includes a reminder list.
 Date-specific reminders are included 7 days before, 2 days before, and
 on the day of the reminder. Recurring or continual reminders are
 included whenever currently active. If no reminders match those rules,
-the agent sends the check-in, weather if available, and news only.
+the agent sends the check-in, weather if available, today's agenda if
+available, and news only.
 
 `GMAIL_ENABLED` controls the optional Gmail ingestion worker. Leave it
 `false` until Gmail OAuth has been configured. `GMAIL_STATE_DIR` stores
