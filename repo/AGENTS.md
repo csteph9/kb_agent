@@ -99,6 +99,24 @@ management is not the primary purpose of processing the correspondence.
 - Do not guess unclear contact details or merge people whose identities are
   ambiguous. Leave uncertain information in `inbox/` for later review.
 
+## Email ingestion
+
+When processing email, store durable knowledge, not raw email archives.
+Capture deadlines, appointments, people, organizations, decisions, follow-ups,
+policy/provider details, and other useful facts.
+
+Ignore marketing, newsletters, transient notifications, one-time codes,
+password resets, authentication/security alerts, and messages that primarily
+contain sensitive credentials or account-access information.
+
+Do not ingest messages from known banks, credit-card issuers, brokerages,
+payment processors, lenders, tax/payment platforms, or similar financial
+institutions unless the user explicitly asks for a specific message to be
+processed. These messages often contain sensitive financial/account details.
+If the user explicitly asks to process one, extract only non-sensitive durable
+facts and do not store account numbers, card numbers, balances, transaction
+details, login/security information, or payment credentials.
+
 ## Answering questions
 
 When asked a question about information in this repository:

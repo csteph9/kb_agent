@@ -221,15 +221,20 @@ The application distribution contains:
 .
 ├── .env-example
 ├── bot.js
+├── gmail-auth.js
+├── gmail-ingest.js
 ├── http-puller-service.js
 ├── http-puller.js
 ├── repo/
 │   └── AGENTS.md
+├── run-gmail-ingest.sh
 ├── run-codex.sh
 ├── sync-repo.sh
 ├── sync.sh
 └── services/
     ├── knowledge-agent.service
+    ├── knowledge-gmail-ingest.service
+    ├── knowledge-gmail-ingest.timer
     ├── knowledge-http-puller.path
     ├── knowledge-http-puller.service
     ├── knowledge-sync.service
@@ -295,9 +300,12 @@ From the downloaded/cloned application repository:
 sudo mkdir -p /opt/knowledge-agent
 
 sudo cp bot.js /opt/knowledge-agent/
+sudo cp gmail-auth.js /opt/knowledge-agent/
+sudo cp gmail-ingest.js /opt/knowledge-agent/
 sudo cp http-puller.js /opt/knowledge-agent/
 sudo cp http-puller-service.js /opt/knowledge-agent/
 sudo cp run-codex.sh /opt/knowledge-agent/
+sudo cp run-gmail-ingest.sh /opt/knowledge-agent/
 sudo cp sync-repo.sh /opt/knowledge-agent/
 sudo cp sync.sh /opt/knowledge-agent/
 sudo cp .env-example /opt/knowledge-agent/
@@ -309,15 +317,20 @@ Set permissions:
 
 ``` bash
 sudo chmod 755 \
+  /opt/knowledge-agent/gmail-auth.js \
+  /opt/knowledge-agent/gmail-ingest.js \
   /opt/knowledge-agent/http-puller.js \
   /opt/knowledge-agent/http-puller-service.js \
   /opt/knowledge-agent/run-codex.sh \
+  /opt/knowledge-agent/run-gmail-ingest.sh \
   /opt/knowledge-agent/sync-repo.sh \
   /opt/knowledge-agent/sync.sh
 
 sudo mkdir -p /opt/knowledge-agent/sessions
+sudo mkdir -p /opt/knowledge-agent/gmail
 sudo chown -R knowledge:knowledge /opt/knowledge-agent
 sudo chmod 700 /opt/knowledge-agent/sessions
+sudo chmod 700 /opt/knowledge-agent/gmail
 ```
 
 # 4. Install Node dependencies
@@ -325,7 +338,7 @@ sudo chmod 700 /opt/knowledge-agent/sessions
 ``` bash
 cd /opt/knowledge-agent
 sudo -u knowledge -H npm init -y
-sudo -u knowledge -H npm install grammy dotenv
+sudo -u knowledge -H npm install grammy dotenv googleapis
 ```
 
 Ensure `package.json` contains:
@@ -342,6 +355,8 @@ Syntax-check the JavaScript:
 
 ``` bash
 sudo -u knowledge -H node --check /opt/knowledge-agent/bot.js
+sudo -u knowledge -H node --check /opt/knowledge-agent/gmail-auth.js
+sudo -u knowledge -H node --check /opt/knowledge-agent/gmail-ingest.js
 sudo -u knowledge -H node --check /opt/knowledge-agent/http-puller.js
 sudo -u knowledge -H node --check /opt/knowledge-agent/http-puller-service.js
 ```
@@ -583,6 +598,11 @@ REMINDER_TIME=08:00
 REMINDER_FILE=reminders.md
 REMINDER_WEATHER_LOCATION=San Francisco, CA
 REMINDER_NEWS_FEEDS=https://feeds.bbci.co.uk/news/rss.xml,https://feeds.npr.org/1001/rss.xml,https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml
+GMAIL_ENABLED=false
+GMAIL_STATE_DIR=/opt/knowledge-agent/gmail
+GMAIL_QUERY=newer_than:14d -category:promotions -category:social
+GMAIL_MAX_MESSAGES_PER_RUN=10
+GMAIL_MAX_EMAIL_CHARS=20000
 ```
 
 For multiple people:
@@ -621,6 +641,14 @@ Date-specific reminders are included 7 days before, 2 days before, and
 on the day of the reminder. Recurring or continual reminders are
 included whenever currently active. If no reminders match those rules,
 the agent sends the check-in, weather if available, and news only.
+
+`GMAIL_ENABLED` controls the optional Gmail ingestion worker. Leave it
+`false` until Gmail OAuth has been configured. `GMAIL_STATE_DIR` stores
+OAuth credentials, tokens, and processed-message state outside Git.
+`GMAIL_QUERY` is the Gmail search query used to select candidate
+messages. `GMAIL_MAX_MESSAGES_PER_RUN` limits work per timer run.
+`GMAIL_MAX_EMAIL_CHARS` limits how much text from any one email is
+provided to Codex.
 
 Protect the file:
 
@@ -695,6 +723,30 @@ controlled HTTP bridge.
 It is triggered on demand by `knowledge-http-puller.path`; it does not
 need to remain running continuously.
 
+## `knowledge-gmail-ingest.service`
+
+Runs one Gmail ingestion pass. It reads candidate messages through the
+Gmail API, filters obvious non-KB material and known financial senders,
+asks Codex to extract durable knowledge, and commits/pushes any Markdown
+updates.
+
+Manual test after Gmail OAuth is configured:
+
+``` bash
+sudo systemctl start knowledge-gmail-ingest.service
+```
+
+## `knowledge-gmail-ingest.timer`
+
+Periodically launches `knowledge-gmail-ingest.service`.
+
+Leave this disabled until Gmail OAuth is configured and
+`GMAIL_ENABLED=true` has been set in `/opt/knowledge-agent/.env`.
+
+``` bash
+sudo systemctl enable --now knowledge-gmail-ingest.timer
+```
+
 # 11. Verify systemd
 
 ``` bash
@@ -703,6 +755,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now knowledge-agent.service
 sudo systemctl enable --now knowledge-sync.timer
 sudo systemctl enable --now knowledge-http-puller.path
+# Optional, after Gmail OAuth setup:
+# sudo systemctl enable --now knowledge-gmail-ingest.timer
 ```
 
 Inspect:
@@ -711,6 +765,8 @@ Inspect:
 sudo systemctl status knowledge-agent.service --no-pager -l
 sudo systemctl status knowledge-sync.timer --no-pager -l
 sudo systemctl status knowledge-http-puller.path --no-pager -l
+# Optional:
+# sudo systemctl status knowledge-gmail-ingest.timer --no-pager -l
 
 systemctl list-timers --all | grep knowledge
 ```
@@ -727,6 +783,10 @@ sudo journalctl -u knowledge-sync.service -n 100 --no-pager
 
 ``` bash
 sudo journalctl -u knowledge-http-puller.service -n 100 --no-pager
+```
+
+``` bash
+sudo journalctl -u knowledge-gmail-ingest.service -n 100 --no-pager
 ```
 
 # 12. Test Telegram
@@ -778,6 +838,84 @@ Then remove the test:
 ``` text
 Remove the Project Orion test information from my knowledge base.
 ```
+
+## Optional Gmail ingestion
+
+Gmail ingestion is optional and disabled by default. It uses the Gmail
+API with the read-only scope:
+
+``` text
+https://www.googleapis.com/auth/gmail.readonly
+```
+
+Create a Google Cloud project, enable the Gmail API, configure the OAuth
+consent screen, and create an OAuth client. For a personal server, a
+Desktop app OAuth client is the simplest starting point.
+
+Copy the downloaded OAuth client JSON to:
+
+``` text
+/opt/knowledge-agent/gmail/credentials.json
+```
+
+Protect it:
+
+``` bash
+sudo chown -R knowledge:knowledge /opt/knowledge-agent/gmail
+sudo chmod 700 /opt/knowledge-agent/gmail
+sudo chmod 600 /opt/knowledge-agent/gmail/credentials.json
+```
+
+Authorize Gmail as the service account:
+
+``` bash
+sudo -u knowledge -H node /opt/knowledge-agent/gmail-auth.js
+```
+
+Open the displayed URL, approve access, paste the authorization code
+back into the terminal, and verify that the token was created:
+
+``` bash
+sudo ls -l /opt/knowledge-agent/gmail/token.json
+```
+
+Enable Gmail ingestion in `/opt/knowledge-agent/.env`:
+
+``` text
+GMAIL_ENABLED=true
+GMAIL_STATE_DIR=/opt/knowledge-agent/gmail
+GMAIL_QUERY=newer_than:14d -category:promotions -category:social
+GMAIL_MAX_MESSAGES_PER_RUN=10
+GMAIL_MAX_EMAIL_CHARS=20000
+```
+
+Run one manual ingestion pass:
+
+``` bash
+sudo systemctl start knowledge-gmail-ingest.service
+sudo journalctl -u knowledge-gmail-ingest.service -n 100 --no-pager
+```
+
+If that succeeds, enable the timer:
+
+``` bash
+sudo systemctl enable --now knowledge-gmail-ingest.timer
+```
+
+The ingestion worker stores processed Gmail message IDs in:
+
+``` text
+/opt/knowledge-agent/gmail/state.json
+```
+
+It does not intentionally store raw emails. It asks Codex to extract
+durable knowledge such as appointments, deadlines, future-dated
+reminders, people, contact updates, decisions, project updates,
+policy/provider details, travel plans, and warranties.
+
+Messages from likely financial senders are skipped before Codex sees the
+body. This includes common banks, credit-card issuers, brokerages,
+payment processors, lenders, and tax/payment platforms.
 
 # 13. Multi-user operation
 
@@ -1023,6 +1161,12 @@ sudo systemctl stop knowledge-agent.service
 sudo -u knowledge -H \
   node --check /opt/knowledge-agent/bot.js
 
+sudo -u knowledge -H \
+  node --check /opt/knowledge-agent/gmail-auth.js
+
+sudo -u knowledge -H \
+  node --check /opt/knowledge-agent/gmail-ingest.js
+
 sudo systemctl daemon-reload
 sudo systemctl restart knowledge-agent.service
 
@@ -1090,6 +1234,19 @@ sudo journalctl -u knowledge-http-puller.service -n 100 --no-pager
 Remember: `http-puller.js` is the client; `http-puller-service.js` is
 the worker. Both are required.
 
+### Gmail ingestion fails
+
+``` bash
+sudo systemctl status knowledge-gmail-ingest.service --no-pager -l
+sudo journalctl -u knowledge-gmail-ingest.service -n 100 --no-pager
+sudo -u knowledge -H ls -l /opt/knowledge-agent/gmail
+sudo -u knowledge -H git -C /home/knowledge/repo status
+```
+
+Check that `GMAIL_ENABLED=true`, `credentials.json`, and `token.json`
+exist under `/opt/knowledge-agent/gmail`, and that the KB repository is
+clean before the ingestion run starts.
+
 # 23. Final checklist
 
 A healthy installation has:
@@ -1108,6 +1265,9 @@ A healthy installation has:
 -   Desktop Git changes synchronizing back to the server.
 -   Separate Telegram session files for separate authorized users.
 -   HTTP puller able to retrieve an allowed public URL.
+-   Optional Gmail ingestion has `knowledge-gmail-ingest.timer` active,
+    valid OAuth files under `/opt/knowledge-agent/gmail`, and a clean
+    processed-message state file.
 -   No secrets committed to either repository.
 
 ------------------------------------------------------------------------

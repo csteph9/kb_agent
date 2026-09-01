@@ -1,0 +1,18 @@
+[Unit]
+Description=Ingest Gmail into Knowledge Base
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+
+User=knowledge
+Group=knowledge
+
+WorkingDirectory=/opt/knowledge-agent
+EnvironmentFile=/opt/knowledge-agent/.env
+
+Environment=HOME=/home/knowledge
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+ExecStart=/usr/bin/node /opt/knowledge-agent/gmail-ingest.js

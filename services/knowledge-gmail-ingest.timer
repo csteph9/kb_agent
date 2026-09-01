@@ -1,0 +1,10 @@
+[Unit]
+Description=Ingest Gmail into Knowledge Base every 10 minutes
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
