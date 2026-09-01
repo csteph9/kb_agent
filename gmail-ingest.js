@@ -113,7 +113,7 @@ function decodeBase64Url(value) {
     ).toString("utf8");
 }
 
-function collectTextParts(part, output = []) {
+function collectBodyParts(part, output = { plain: [], html: [] }) {
     if (!part) {
         return output;
     }
@@ -122,7 +122,18 @@ function collectTextParts(part, output = []) {
         part.mimeType === "text/plain" &&
         part.body?.data
     ) {
-        output.push(
+        output.plain.push(
+            decodeBase64Url(
+                part.body.data
+            )
+        );
+    }
+
+    if (
+        part.mimeType === "text/html" &&
+        part.body?.data
+    ) {
+        output.html.push(
             decodeBase64Url(
                 part.body.data
             )
@@ -130,7 +141,7 @@ function collectTextParts(part, output = []) {
     }
 
     for (const child of part.parts || []) {
-        collectTextParts(
+        collectBodyParts(
             child,
             output
         );
@@ -139,14 +150,43 @@ function collectTextParts(part, output = []) {
     return output;
 }
 
+function stripHtml(html) {
+    return html
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<\/div>/gi, "\n")
+        .replace(/<\/tr>/gi, "\n")
+        .replace(/<\/li>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, "\"")
+        .replace(/&#39;/g, "'")
+        .replace(/[ \t]+/g, " ")
+        .replace(/\n\s+/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+}
+
 function extractBody(message) {
     const parts =
-        collectTextParts(
+        collectBodyParts(
             message.payload
         );
 
-    if (parts.length) {
-        return parts.join("\n\n");
+    if (parts.plain.length) {
+        return parts.plain.join("\n\n");
+    }
+
+    if (parts.html.length) {
+        return parts.html
+            .map(stripHtml)
+            .filter(Boolean)
+            .join("\n\n");
     }
 
     if (message.payload?.body?.data) {
@@ -460,6 +500,21 @@ Capture useful durable facts such as deadlines, appointments, people,
 organizations, contact updates, decisions, project updates, follow-ups,
 policy/provider details, travel plans, warranties, and future-dated items.
 
+Non-financial vendor invoices and receipts are KB-worthy when they document
+services, subscriptions, infrastructure, warranties, business operations, or
+renewals. For these, preserve a concise summary with vendor, invoice/receipt
+number, invoice date, service period, service/product description, total
+amount, support/contact context, and useful links. Examples include cloud
+hosting, software subscriptions, utilities, medical/veterinary providers, home
+services, travel providers, and equipment purchases.
+
+Operational identifiers are allowed when useful. Preserve membership IDs,
+registration numbers, confirmation numbers, appointment IDs, claim numbers,
+policy numbers, provider names, and similar non-authentication identifiers.
+USA Hockey or USAH registration numbers are allowed to store and return when
+asked. Do not treat them as prohibited PII merely because they identify a
+person's membership or registration.
+
 If an email includes a future date, add or update a concise reminder in
 reminders.md as appropriate.
 
@@ -468,8 +523,11 @@ password resets, authentication/security alerts, and messages that primarily
 contain sensitive credentials or account-access information.
 
 Do not store raw email text. Do not store prohibited personal information,
-payment credentials, bank/card/account numbers, transaction details, balances,
-passwords, API tokens, recovery codes, or government-issued identifiers.
+payment credentials, bank/card/account numbers, banking transaction details,
+financial account balances, passwords, API tokens, recovery codes, or
+government-issued identifiers. For allowed vendor invoices/receipts, the
+invoice total, invoice number, vendor, and purchased service details are
+permitted.
 
 Search the repository before creating new files. Update existing files when
 appropriate. If none of these emails contain durable KB-worthy information,

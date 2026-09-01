@@ -117,6 +117,14 @@ If the user explicitly asks to process one, extract only non-sensitive durable
 facts and do not store account numbers, card numbers, balances, transaction
 details, login/security information, or payment credentials.
 
+Non-financial vendor invoices and receipts are allowed to ingest when they
+document services, subscriptions, infrastructure, warranties, business
+operations, renewals, or useful purchase records. Store a concise summary with
+vendor, invoice/receipt number, invoice date, service period, service/product
+description, total amount, support/contact context, and useful links. Do not
+store payment credentials, card/account numbers, banking transaction details,
+or financial account balances.
+
 ## Answering questions
 
 When asked a question about information in this repository:
