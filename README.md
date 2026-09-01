@@ -226,7 +226,8 @@ The application distribution contains:
 ├── http-puller-service.js
 ├── http-puller.js
 ├── repo/
-│   └── AGENTS.md
+│   ├── AGENTS.md
+│   └── followups.md
 ├── run-gmail-ingest.sh
 ├── run-codex.sh
 ├── sync-repo.sh
@@ -392,6 +393,7 @@ The initial KB will ultimately look approximately like:
 
 ``` text
 AGENTS.md
+followups.md
 inbox/
 daily/
 people/
@@ -477,6 +479,10 @@ Seed the cloned repository with the supplied agent policy:
 sudo -u knowledge -H cp \
   /opt/knowledge-agent/repo/AGENTS.md \
   /home/knowledge/repo/AGENTS.md
+
+sudo -u knowledge -H cp \
+  /opt/knowledge-agent/repo/followups.md \
+  /home/knowledge/repo/followups.md
 ```
 
 Create the standard knowledge directories:
@@ -515,7 +521,7 @@ sudo -u knowledge -H git -C /home/knowledge/repo remote -v
 ```
 
 At this point GitHub should contain the supplied `AGENTS.md` and the
-starter KB directory structure.
+starter `followups.md` file and KB directory structure.
 
 The supplied synchronization scripts expect a configured branch. If your
 KB uses a different default branch, update the branch setting in the

@@ -500,6 +500,13 @@ Capture useful durable facts such as deadlines, appointments, people,
 organizations, contact updates, decisions, project updates, follow-ups,
 policy/provider details, travel plans, warranties, and future-dated items.
 
+If an email requires the user or another known person to respond, decide,
+schedule, pay, renew, submit, review, call, email, bring something, prepare
+something, or take another concrete action, add or update followups.md. Include
+the email date, sender or organization, required action, owner when known, due
+date if any, and status. If the follow-up has a future due date, also add or
+update reminders.md.
+
 Non-financial vendor invoices and receipts are KB-worthy when they document
 services, subscriptions, infrastructure, warranties, business operations, or
 renewals. For these, preserve a concise summary with vendor, invoice/receipt

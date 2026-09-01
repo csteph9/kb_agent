@@ -24,6 +24,8 @@ canonical source of truth.
 - `meetings/` - meeting notes
 - `research/` - research and reference material
 - `decisions/` - important decisions
+- `followups.md` - open loops, replies owed, waiting-on items, and action
+  required from correspondence or conversations
 - `travel/` - travel itens
 - `archive/` - inactive or historical material
 
@@ -124,6 +126,30 @@ vendor, invoice/receipt number, invoice date, service period, service/product
 description, total amount, support/contact context, and useful links. Do not
 store payment credentials, card/account numbers, banking transaction details,
 or financial account balances.
+
+## Follow-ups
+
+Use `followups.md` for open loops, replies owed, waiting-on items, and action
+required from email, messages, meetings, or conversations.
+
+When a source indicates that someone needs to respond, decide, schedule, pay,
+renew, submit, review, call, email, bring something, prepare something, or take
+another concrete action:
+
+1. Search `followups.md` and relevant project/person/company files before
+   creating a new follow-up.
+2. Add or update a concise `followups.md` entry.
+3. Include the source date, source/person/organization, required action, owner
+   when known, due date if any, and current status.
+4. Use ISO dates in the form YYYY-MM-DD for due dates.
+5. If the follow-up has a future due date, also add or update `reminders.md`.
+6. Preserve useful context in the relevant person, company, project, or topic
+   file when appropriate, but do not duplicate long source text.
+7. Mark a follow-up complete only when the user says it is complete or the
+   source clearly confirms completion.
+
+If a possible follow-up is ambiguous, record it in `followups.md` with a
+`Needs clarification` status rather than dropping it.
 
 ## Answering questions
 
