@@ -904,7 +904,7 @@ the local HTTP retrieval bridge:
 
 ${newsFeeds}
 
-Parse the actual feed entries and include the top 5 news items total,
+Parse the actual feed entries and include the top 10 news items total,
 deduplicated across feeds. Prefer broadly important/top headlines. Each
 item should include the source name and a short title. Include links
 only if they fit cleanly in the Telegram message. If news retrieval

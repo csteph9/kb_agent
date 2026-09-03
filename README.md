@@ -631,7 +631,7 @@ to read in the knowledge repository. The default is `reminders.md`.
 At the configured time, the agent asks Codex to read that file and send
 a brief personalized wake-up/check-in message to every configured
 `TELEGRAM_ALLOWED_USER_IDS` user. The message includes daily weather
-when a location is available and the top five current news items from
+when a location is available and the top ten current news items from
 the configured public RSS feeds. It also searches the KB for today's
 agenda items, including appointments, practices, games, meetings,
 travel, reservations, deadlines, school items, medical/veterinary items,
