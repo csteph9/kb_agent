@@ -609,6 +609,9 @@ GMAIL_STATE_DIR=/opt/knowledge-agent/gmail
 GMAIL_QUERY=newer_than:14d -category:promotions -category:social
 GMAIL_MAX_MESSAGES_PER_RUN=10
 GMAIL_MAX_EMAIL_CHARS=20000
+GMAIL_PROCESS_ATTACHMENTS=true
+GMAIL_MAX_ATTACHMENTS_PER_MESSAGE=5
+GMAIL_MAX_ATTACHMENT_CHARS=50000
 ```
 
 For multiple people:
@@ -659,6 +662,12 @@ OAuth credentials, tokens, and processed-message state outside Git.
 messages. `GMAIL_MAX_MESSAGES_PER_RUN` limits work per timer run.
 `GMAIL_MAX_EMAIL_CHARS` limits how much text from any one email is
 provided to Codex.
+
+`GMAIL_PROCESS_ATTACHMENTS` controls whether supported Gmail
+attachments are extracted and provided to Codex. PDFs are converted with
+`pdftotext -layout`; text-oriented attachments are read directly.
+`GMAIL_MAX_ATTACHMENTS_PER_MESSAGE` and `GMAIL_MAX_ATTACHMENT_CHARS`
+limit attachment processing per email.
 
 Protect the file:
 
@@ -897,6 +906,9 @@ GMAIL_STATE_DIR=/opt/knowledge-agent/gmail
 GMAIL_QUERY=newer_than:14d -category:promotions -category:social
 GMAIL_MAX_MESSAGES_PER_RUN=10
 GMAIL_MAX_EMAIL_CHARS=20000
+GMAIL_PROCESS_ATTACHMENTS=true
+GMAIL_MAX_ATTACHMENTS_PER_MESSAGE=5
+GMAIL_MAX_ATTACHMENT_CHARS=50000
 ```
 
 Run one manual ingestion pass:
@@ -921,7 +933,16 @@ The ingestion worker stores processed Gmail message IDs in:
 It does not intentionally store raw emails. It asks Codex to extract
 durable knowledge such as appointments, deadlines, future-dated
 reminders, people, contact updates, decisions, project updates,
-policy/provider details, travel plans, and warranties.
+policy/provider details, travel plans, and warranties. Supported
+attachments are temporary input only. PDFs and text-oriented attachments
+are extracted so important details inside attachments can be cataloged;
+the original attachment files are not copied into the KB unless the user
+explicitly asks.
+
+Forwarded, quoted, and included email threads are processed as source
+material too. The agent should inspect embedded headers and signatures
+for useful contacts, dates, follow-ups, and durable facts while keeping
+outer-message and forwarded-message context distinct.
 
 Messages from likely financial senders are skipped before Codex sees the
 body. This includes common banks, credit-card issuers, brokerages,
