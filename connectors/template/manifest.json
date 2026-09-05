@@ -1,0 +1,1 @@
+{"id":"template","apiVersion":1,"description":"Copy this directory to build a connector","capabilities":["poll","manual"],"configSchema":{"type":"object"}}

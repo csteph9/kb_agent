@@ -1,0 +1,16 @@
+{
+  "id": "research-feed",
+  "connector": "rss",
+  "enabled": false,
+  "config": {
+    "url": "https://example.org/feed.xml"
+  },
+  "schedule": {
+    "everySeconds": 3600
+  },
+  "ingestion": {
+    "profile": "research",
+    "maxItemsPerRun": 10,
+    "purpose": "Research relevant to my ongoing projects"
+  }
+}

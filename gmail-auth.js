@@ -3,9 +3,15 @@ import fs from "fs/promises";
 import readline from "readline/promises";
 import process from "process";
 
-const STATE_DIR =
-    process.env.GMAIL_STATE_DIR ||
-    "/opt/knowledge-agent/gmail";
+import path from "node:path";
+import { sources, stateDir as runtimeDir, validId } from "./ingest/config.js";
+const sourceId = process.argv[2];
+const source = sourceId ? (await sources()).find(s => s.id === sourceId && s.connector === "gmail") : null;
+if (sourceId && !source) throw new Error("Unknown Gmail source");
+if (source?.credentialsRef && !validId(source.credentialsRef)) throw new Error("Invalid credentialsRef");
+const STATE_DIR = source
+    ? source.config.stateDir || path.join(runtimeDir, "credentials", source.credentialsRef || source.id)
+    : process.env.GMAIL_STATE_DIR || "/opt/knowledge-agent/gmail";
 
 const CREDENTIALS_PATH =
     `${STATE_DIR}/credentials.json`;

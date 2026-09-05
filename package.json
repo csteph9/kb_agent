@@ -1,0 +1,21 @@
+{
+  "name": "knowledge-agent",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.16.0"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "ingest": "node ingest/cli.js"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "dotenv": "^16.6.1",
+    "fast-xml-parser": "^5.3.0",
+    "googleapis": "^160.0.0",
+    "grammy": "^1.38.0",
+    "ical.js": "^2.2.1",
+    "ipaddr.js": "^2.2.0"
+  }
+}

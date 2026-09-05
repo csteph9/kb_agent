@@ -1,0 +1,18 @@
+{
+  "id": "personal-gmail",
+  "connector": "gmail",
+  "enabled": false,
+  "owner": "your_user_name",
+  "config": {
+    "stateDir": "/opt/knowledge-agent/gmail",
+    "query": "newer_than:14d -category:promotions -category:social"
+  },
+  "schedule": {
+    "everySeconds": 600
+  },
+  "ingestion": {
+    "profile": "personal-correspondence",
+    "maxItemsPerRun": 10,
+    "maxItemChars": 400000
+  }
+}

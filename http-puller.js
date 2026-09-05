@@ -88,7 +88,7 @@ await fs.mkdir(
 );
 
 await fs.writeFile(
-    requestFile,
+    requestFile + ".tmp",
     JSON.stringify({
         url: rawUrl
     }),
@@ -96,6 +96,8 @@ await fs.writeFile(
         mode: 0o600
     }
 );
+
+await fs.rename(requestFile + ".tmp", requestFile);
 
 const started =
     Date.now();

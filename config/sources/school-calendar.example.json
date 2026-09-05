@@ -1,0 +1,16 @@
+{
+  "id": "school-calendar",
+  "connector": "calendar",
+  "enabled": false,
+  "owner": "household",
+  "config": {
+    "url": "https://example.org/calendar.ics"
+  },
+  "schedule": {
+    "everySeconds": 3600
+  },
+  "ingestion": {
+    "profile": "calendar",
+    "maxItemsPerRun": 20
+  }
+}

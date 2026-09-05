@@ -1,0 +1,10 @@
+[Unit]
+Description=Check for due knowledge ingestion sources
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+Unit=knowledge-ingest.service
+
+[Install]
+WantedBy=timers.target

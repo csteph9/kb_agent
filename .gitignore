@@ -1,7 +1,9 @@
-﻿.env
+.env
 sessions/
-gmail/
+/gmail/
 node_modules/
-package-lock.json
+config/sources/*.json
+!config/sources/*.example.json
+var/
 .DS_Store
 Thumbs.db

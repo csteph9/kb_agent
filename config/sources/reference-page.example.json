@@ -1,0 +1,16 @@
+{
+  "id": "reference-page",
+  "connector": "website",
+  "enabled": false,
+  "config": {
+    "url": "https://example.org/reference",
+    "title": "Reference page"
+  },
+  "schedule": {
+    "everySeconds": 86400
+  },
+  "ingestion": {
+    "profile": "research",
+    "maxItemsPerRun": 1
+  }
+}

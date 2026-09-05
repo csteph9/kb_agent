@@ -1,0 +1,39 @@
+{
+  "id": "gmail",
+  "apiVersion": 1,
+  "description": "Read-only Gmail correspondence",
+  "capabilities": [
+    "poll",
+    "manual"
+  ],
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "stateDir": {
+        "type": "string"
+      },
+      "query": {
+        "type": "string"
+      },
+      "maxEmailChars": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000000
+      },
+      "processAttachments": {
+        "type": "boolean"
+      },
+      "maxAttachments": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "maxAttachmentChars": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000000
+      }
+    },
+    "additionalProperties": false
+  }
+}

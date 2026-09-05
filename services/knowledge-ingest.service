@@ -1,0 +1,16 @@
+[Unit]
+Description=Run due knowledge ingestion sources
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=knowledge
+Group=knowledge
+WorkingDirectory=/opt/knowledge-agent
+EnvironmentFile=/opt/knowledge-agent/.env
+Environment=HOME=/home/knowledge
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+UMask=0077
+ExecStart=/usr/bin/node /opt/knowledge-agent/ingest/cli.js due
+TimeoutStartSec=infinity

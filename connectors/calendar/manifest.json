@@ -1,0 +1,1 @@
+{"id":"calendar","apiVersion":1,"description":"ICS calendar feeds","capabilities":["poll","manual"],"configSchema":{"type":"object","required":["url"],"properties":{"url":{"type":"string"}}}}

@@ -1,0 +1,1 @@
+{"id":"rss","apiVersion":1,"description":"RSS and Atom feeds","capabilities":["poll","manual"],"configSchema":{"type":"object","required":["url"],"properties":{"url":{"type":"string"}}}}
