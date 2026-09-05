@@ -231,30 +231,91 @@ The application distribution contains:
 
 ``` text
 .
-├── .env-example
-├── bot.js
-├── gmail-auth.js
-├── gmail-ingest.js
-├── http-puller-service.js
-├── http-puller.js
-├── repo/
-│   ├── AGENTS.md
-│   └── followups.md
-├── run-gmail-ingest.sh
-├── run-codex.sh
-├── sync-repo.sh
-├── sync.sh
-└── services/
-    ├── knowledge-agent.service
-    ├── knowledge-ingest.service
-    ├── knowledge-ingest.timer
-    ├── knowledge-http-puller.path
-    ├── knowledge-http-puller.service
-    ├── knowledge-sync.service
-    └── knowledge-sync.timer
+|-- .env-example
+|-- .gitattributes
+|-- .gitignore
+|-- README.md
+|-- bot.js
+|-- config/
+|   \-- sources/
+|       |-- personal-gmail.example.json
+|       |-- reference-page.example.json
+|       |-- research-feed.example.json
+|       \-- school-calendar.example.json
+|-- connectors/
+|   |-- calendar/
+|   |   |-- connector.js
+|   |   \-- manifest.json
+|   |-- gmail/
+|   |   |-- connector.js
+|   |   |-- manifest.json
+|   |   \-- policy.js
+|   |-- rss/
+|   |   |-- connector.js
+|   |   \-- manifest.json
+|   |-- template/
+|   |   |-- connector.js
+|   |   \-- manifest.json
+|   \-- website/
+|       |-- connector.js
+|       \-- manifest.json
+|-- deploy-ingest.sh
+|-- docs/
+|   \-- ingestion.md
+|-- gmail-auth.js
+|-- gmail-ingest.js
+|-- http-puller-service.js
+|-- http-puller.js
+|-- ingest/
+|   |-- cli.js
+|   |-- config.js
+|   |-- documents.js
+|   |-- http.js
+|   |-- knowledge-writer.js
+|   |-- process.js
+|   |-- registry.js
+|   |-- runner.js
+|   \-- state.js
+|-- package-lock.json
+|-- package.json
+|-- repo/
+|   |-- AGENTS.md
+|   \-- followups.md
+|-- run-codex.sh
+|-- run-gmail-ingest.sh
+|-- run-ingest-write.sh
+|-- services/
+|   |-- knowledge-agent.service
+|   |-- knowledge-gmail-ingest.service
+|   |-- knowledge-gmail-ingest.timer
+|   |-- knowledge-http-puller.path
+|   |-- knowledge-http-puller.service
+|   |-- knowledge-ingest.service
+|   |-- knowledge-ingest.timer
+|   |-- knowledge-sync.service
+|   \-- knowledge-sync.timer
+|-- sync-repo.sh
+|-- sync.sh
+\-- tests/
+    |-- connectors.test.js
+    |-- ingest.test.js
+    |-- transaction.sh
+    \-- transaction.test.js
 ```
 
-Install these application files under `/opt/knowledge-agent`.
+`connectors/` contains source adapters and a connector template. `ingest/`
+provides configuration, scheduling, job state, document processing, and knowledge
+writes. `config/sources/` contains disabled source examples; copy an example to
+a source JSON file to configure an instance. See [docs/ingestion.md](docs/ingestion.md)
+for connector development and server operations.
+
+The Gmail entry points and Gmail-specific service units are compatibility
+files. Enable `knowledge-ingest.timer` for scheduled ingestion and keep
+`knowledge-gmail-ingest.timer` disabled.
+
+Install the application under `/opt/knowledge-agent`. Runtime directories such
+as `sessions/`, `gmail/`, and `var/ingest/`, along with active source
+configurations and `.env`, are private server files excluded from the distribution.
 
 The actual knowledge base is a **separate Git repository**, cloned to
 `/home/knowledge/repo`.
@@ -312,7 +373,8 @@ From the downloaded/cloned application repository:
 sudo mkdir -p /opt/knowledge-agent
 
 sudo cp package.json package-lock.json /opt/knowledge-agent/
-sudo cp -r ingest connectors config /opt/knowledge-agent/
+sudo cp -r ingest connectors config docs tests /opt/knowledge-agent/
+sudo cp README.md /opt/knowledge-agent/
 sudo cp run-ingest-write.sh deploy-ingest.sh /opt/knowledge-agent/
 sudo cp bot.js /opt/knowledge-agent/
 sudo cp gmail-auth.js /opt/knowledge-agent/
