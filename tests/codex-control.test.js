@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { controlledRun, settings, observeEvent, failureKind, retryAfterMs, userErrorMessage } from '../codex-control.js';
+import { controlledRun, settings, observeEvent, failureKind, retryAfterMs, userErrorMessage, pinnedCodexArgs } from '../codex-control.js';
 
 const ok = { code: 0, completed: true, error: '' };
 const busy = { code: 1, error: 'Model is at capacity' };
@@ -99,4 +99,13 @@ test('user messages distinguish transient failures and already committed updates
   assert.match(userErrorMessage({ exitCode: 75 }), /temporarily busy/);
   assert.match(userErrorMessage({ exitCode: 2 }), /saved locally/);
   assert.match(userErrorMessage({ exitCode: 73 }), /existing files were preserved/);
+});
+test('every invocation is pinned to GPT-5.6 Sol with medium reasoning', () => {
+  assert.deepEqual(pinnedCodexArgs(['-C', '/tmp/work', 'exec', '--json', '-']), [
+    '-C', '/tmp/work', '--model', 'gpt-5.6-sol',
+    '-c', 'model_reasoning_effort="medium"',
+    '-c', 'features.multi_agent=false', 'exec', '--json', '-'
+  ]);
+  assert.throws(() => pinnedCodexArgs(['--model', 'other', 'exec']), /override rejected/);
+  assert.throws(() => pinnedCodexArgs(['-c', 'model_reasoning_effort="high"', 'exec']), /override rejected/);
 });

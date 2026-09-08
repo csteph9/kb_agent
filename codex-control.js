@@ -74,6 +74,25 @@ export function observeEvent(state, event) {
   if (event.type?.startsWith('item.') && !['reasoning', 'agent_message', 'plan'].includes(event.item?.type)) state.tools = true;
 }
 
+export function pinnedCodexArgs(args) {
+  const execIndex = args.indexOf('exec');
+  if (execIndex < 0) throw new Error('Codex exec subcommand required');
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--model' || args[i] === '-m') throw new Error('Codex model override rejected');
+    if ((args[i] === '--config' || args[i] === '-c') &&
+        /^(?:model|model_reasoning_effort)=/.test(args[i + 1] || '')) {
+      throw new Error('Codex model override rejected');
+    }
+  }
+  return [
+    ...args.slice(0, execIndex),
+    '--model', 'gpt-5.6-sol',
+    '-c', 'model_reasoning_effort="medium"',
+    '-c', 'features.multi_agent=false',
+    ...args.slice(execIndex),
+  ];
+}
+
 async function attempt(args, prompt, output) {
   const state = { completed: false, failed: false, tools: false, error: '', uncertain: false };
   const child = spawn('codex', args, { stdio: ['pipe', 'pipe', 'pipe'] });
@@ -148,8 +167,8 @@ async function main() {
         await fs.writeFile(stateFile + '.tmp', JSON.stringify(state), { mode: 0o600 });
         await fs.rename(stateFile + '.tmp', stateFile);
       },
-      // Prevent parallel subagents within application-owned research turns.
-      invoke: () => attempt(['-c', 'features.multi_agent=false', ...args], prompt, output),
+      // Pin every application-owned call, including resumed sessions.
+      invoke: () => attempt(pinnedCodexArgs(args), prompt, output),
       log: message => console.error(message),
     });
     // Earlier thread.started events must not become the saved session ID.
