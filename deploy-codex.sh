@@ -29,7 +29,10 @@ restore() {
 trap restore EXIT
 systemctl stop knowledge-ingest.timer
 echo 'Waiting up to 20 minutes for the current KB transaction to finish...'
-exec 9>"$LOCK"
+# fs.protected_regular can reject root's O_CREAT open of a knowledge-owned
+# file in sticky /tmp. Create as its owner, then take flock on a read-only FD.
+runuser -u knowledge -- touch -- "$LOCK"
+exec 9<"$LOCK"
 flock -w 1200 9 || { echo 'KB is still busy. Nothing was installed; retry later.'; exit 1; }
 # Once we hold the repository lock, no cooperating writer can be mid-edit.
 systemctl stop knowledge-agent.service knowledge-ingest.service
