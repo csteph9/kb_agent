@@ -33,9 +33,12 @@ git worktree add --detach "$WORK" HEAD >/dev/null 2>&1
 BASE="$(git rev-parse HEAD)"
 echo 'Running knowledge extraction in temporary worktree' >&2
 # Capture all model output privately; only stage names reach the journal.
-if ! timeout --kill-after=30s "${INGEST_MODEL_TIMEOUT_SECONDS:-900}s" codex exec --sandbox workspace-write -C "$WORK" - <"$PROMPT" >"$TEMP/model.log" 2>&1; then
+if CODEX_CALL_TIMEOUT_SECONDS="${INGEST_MODEL_TIMEOUT_SECONDS:-${CODEX_CALL_TIMEOUT_SECONDS:-900}}" bash "$APP/run-codex-call.sh" exec --json --sandbox workspace-write -C "$WORK" - <"$PROMPT" >"$TEMP/model.log"; then
+  :
+else
+  code=$?
   echo 'Knowledge extraction failed; live checkout unchanged' >&2
-  exit 1
+  exit "$code"
 fi
 # Reject Git commits made by the model and changes to policy, hidden files, symlinks or non-Markdown files.
 [[ "$(git -C "$WORK" rev-parse HEAD)" == "$BASE" ]] || { echo 'Unexpected model Git commit' >&2; exit 1; }

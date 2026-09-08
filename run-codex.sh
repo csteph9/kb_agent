@@ -1,212 +1,76 @@
 #!/bin/bash
-
-set -u
-
-REPO="/home/knowledge/repo"
-LOCK="/tmp/knowledge-repo.lock"
-SYNC="/opt/knowledge-agent/sync-repo.sh"
-
-OUTPUT="$1"
+set -euo pipefail
+umask 077
+APP="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO="${KNOWLEDGE_REPO:-/home/knowledge/repo}"
+LOCK="${KNOWLEDGE_REPO_LOCK:-/tmp/knowledge-repo.lock}"
+SYNC="${KNOWLEDGE_SYNC_SCRIPT:-$APP/sync-repo.sh}"
+OUTPUT="${1:?Output file required}"
 SESSION_ID="${2:-}"
 IMAGE="${3:-}"
-JSON_OUTPUT="${4:-}"
+JSON_OUTPUT="${4:?JSON output file required}"
 MODE="${5:-READ}"
-
-if [ "$MODE" != "READ" ] && [ "$MODE" != "WRITE" ]; then
-    echo "Invalid mode: $MODE" >&2
-    exit 1
+[[ "$MODE" == READ || "$MODE" == WRITE ]] || { echo 'Invalid request mode' >&2; exit 64; }
+[[ "$OUTPUT" == /* && "$JSON_OUTPUT" == /* ]] || { echo 'Output paths must be absolute' >&2; exit 64; }
+cd "$REPO"
+exec 9>"$LOCK"
+flock -w "${CODEX_QUEUE_TIMEOUT_SECONDS:-300}" 9 || { echo 'KB transaction queue busy' >&2; exit 75; }
+[[ -z "$(git status --porcelain)" ]] || { echo 'Repository was dirty before Telegram request; existing files preserved' >&2; exit 73; }
+if [[ "$MODE" == WRITE ]]; then
+  "$SYNC" >/dev/null 2>&1 || { echo 'Pre-Codex synchronization failed' >&2; exit 1; }
 fi
-
-cd "$REPO" || {
-    echo "Could not enter repository: $REPO" >&2
-    exit 1
+[[ -z "$(git status --porcelain)" ]] || { echo 'Repository is dirty after synchronization' >&2; exit 73; }
+BASE="$(git rev-parse HEAD)"
+TEMP="$(mktemp -d)"
+WORK="$TEMP/work"
+cleanup() {
+  git -C "$REPO" worktree remove --force "$WORK" >/dev/null 2>&1 || true
+  rm -rf -- "$TEMP"
 }
-
-(
-    # -----------------------------------------------------------------------
-    # Serialize repository access.
-    # -----------------------------------------------------------------------
-
-    flock -w 300 9 || {
-        echo "Could not acquire repository lock" >&2
-        exit 1
-    }
-
-    echo "$(date -Is) Telegram transaction lock acquired"
-    echo "$(date -Is) Request mode: $MODE"
-
-    # -----------------------------------------------------------------------
-    # Every transaction must start with a clean repository.
-    # -----------------------------------------------------------------------
-
-    if [ -n "$(git status --porcelain)" ]; then
-        echo "$(date -Is) ERROR: Repository was dirty before Telegram request" >&2
-        git status --short >&2
-        exit 1
-    fi
-
-    # -----------------------------------------------------------------------
-    # WRITE requests synchronize BEFORE Codex sees the repository.
-    #
-    # READ requests intentionally skip this.
-    # -----------------------------------------------------------------------
-
-    if [ "$MODE" = "WRITE" ]; then
-
-        echo "$(date -Is) WRITE request: running pre-Codex GitHub sync"
-
-        if ! "$SYNC"; then
-            echo "$(date -Is) ERROR: Pre-Codex synchronization failed" >&2
-            exit 1
-        fi
-
-        echo "$(date -Is) Pre-Codex GitHub sync complete"
-
-    else
-
-        echo "$(date -Is) READ request: skipping GitHub sync"
-
-    fi
-
-    # -----------------------------------------------------------------------
-    # Run Codex.
-    #
-    # New sessions start workspace-write because the same session may later
-    # contain WRITE turns.
-    #
-    # Resumed sessions use the existing Codex session.
-    # -----------------------------------------------------------------------
-
-    if [ -n "$SESSION_ID" ]; then
-
-        echo "$(date -Is) Resuming Codex session $SESSION_ID"
-
-        CODEX_ARGS=(
-            exec
-            resume
-            "$SESSION_ID"
-        )
-
-        if [ -n "$IMAGE" ]; then
-            CODEX_ARGS+=(--image "$IMAGE")
-        fi
-
-        CODEX_ARGS+=(
-            -o "$OUTPUT"
-            -
-        )
-
-        if ! codex "${CODEX_ARGS[@]}"; then
-            echo "$(date -Is) ERROR: Codex failed" >&2
-            exit 1
-        fi
-
-    else
-
-        echo "$(date -Is) Starting new Codex session"
-
-        if [ -z "$JSON_OUTPUT" ]; then
-            echo "$(date -Is) ERROR: JSON output file not supplied for new session" >&2
-            exit 1
-        fi
-
-        CODEX_ARGS=(
-            exec
-            --json
-            --sandbox workspace-write
-            -C "$REPO"
-            -o "$OUTPUT"
-        )
-
-        if [ -n "$IMAGE" ]; then
-            CODEX_ARGS+=(--image "$IMAGE")
-        fi
-
-        CODEX_ARGS+=(-)
-
-        if ! codex "${CODEX_ARGS[@]}" >"$JSON_OUTPUT"; then
-            echo "$(date -Is) ERROR: Codex failed" >&2
-            exit 1
-        fi
-
-    fi
-
-    echo "$(date -Is) Codex complete"
-
-    # -----------------------------------------------------------------------
-    # READ SAFETY
-    #
-    # READ requests must never modify the KB.
-    #
-    # Because the repository was clean when we acquired the lock, any changes
-    # now were made during this Codex turn.
-    # -----------------------------------------------------------------------
-
-    if [ "$MODE" = "READ" ]; then
-
-        if [ -n "$(git status --porcelain)" ]; then
-
-            echo "$(date -Is) WARNING: Codex modified repository during READ request" >&2
-            echo "$(date -Is) Discarding unexpected READ-side changes" >&2
-
-            git status --short >&2
-
-            if ! git reset --hard HEAD; then
-                echo "$(date -Is) ERROR: Could not restore tracked files" >&2
-                exit 1
-            fi
-
-            if ! git clean -fd; then
-                echo "$(date -Is) ERROR: Could not remove unexpected untracked files" >&2
-                exit 1
-            fi
-
-        fi
-
-        echo "$(date -Is) READ transaction complete"
-        exit 0
-    fi
-
-    # -----------------------------------------------------------------------
-    # WRITE MODE
-    #
-    # Commit only if Codex actually changed the KB.
-    # -----------------------------------------------------------------------
-
-    if [ -n "$(git status --porcelain)" ]; then
-
-        echo "$(date -Is) Knowledge base changed; creating commit"
-
-        if ! git add -A; then
-            echo "$(date -Is) ERROR: git add failed" >&2
-            exit 1
-        fi
-
-        if ! git commit -m "Knowledge update via Telegram"; then
-            echo "$(date -Is) ERROR: git commit failed" >&2
-            exit 1
-        fi
-
-        # -------------------------------------------------------------------
-        # Only perform the post-sync if an actual KB commit was created.
-        # -------------------------------------------------------------------
-
-        echo "$(date -Is) Running post-Codex GitHub sync"
-
-        if ! "$SYNC"; then
-            echo "$(date -Is) ERROR: Knowledge was committed locally, but GitHub synchronization failed" >&2
-            exit 2
-        fi
-
-        echo "$(date -Is) Post-Codex GitHub sync complete"
-
-    else
-
-        echo "$(date -Is) WRITE request produced no repository changes"
-        echo "$(date -Is) No post-sync required"
-
-    fi
-
-    echo "$(date -Is) WRITE transaction complete"
-
-) 9>"$LOCK"
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+git worktree add --detach "$WORK" "$BASE" >/dev/null 2>&1
+{
+  printf 'For this turn the KB is the current temporary worktree. Use relative paths here, not absolute paths from earlier conversation turns. Do not run Git commands, launch other Codex processes, or modify AGENTS.md. Only Markdown knowledge changes can be saved.\n\n'
+  cat
+} >"$TEMP/prompt.txt"
+# Override cwd and sandbox for new AND resumed conversations. Old session
+# metadata must not point execution back at the live checkout.
+ARGS=(-C "$WORK" -c 'sandbox_mode="workspace-write"' -c 'sandbox_workspace_write.writable_roots=[]' exec)
+if [[ -n "$SESSION_ID" ]]; then ARGS+=(resume "$SESSION_ID"); fi
+ARGS+=(--json -o "$TEMP/response.txt")
+if [[ -n "$IMAGE" ]]; then ARGS+=(--image "$IMAGE"); fi
+ARGS+=(-)
+echo "Telegram: running $MODE request in temporary worktree" >&2
+if bash "$APP/run-codex-call.sh" "${ARGS[@]}" <"$TEMP/prompt.txt" >"$TEMP/events.jsonl"; then
+  :
+else
+  code=$?
+  echo 'Telegram: request failed; unfinished worktree edits discarded' >&2
+  exit "$code"
+fi
+[[ -s "$TEMP/response.txt" ]] || { echo 'Codex returned no response' >&2; exit 1; }
+[[ "$(git -C "$WORK" rev-parse HEAD)" == "$BASE" ]] || { echo 'Unexpected model Git commit' >&2; exit 1; }
+if [[ "$MODE" == WRITE ]]; then
+  git -C "$WORK" add -A
+  while IFS= read -r -d '' file; do
+    case "$file" in
+      AGENTS.md|*/AGENTS.md|.*|*/.*) echo 'Protected path changed' >&2; exit 1 ;;
+      *.md) ;;
+      *) echo 'Non-Markdown path changed' >&2; exit 1 ;;
+    esac
+    [[ ! -L "$WORK/$file" ]] || { echo 'Symlink changes rejected' >&2; exit 1; }
+  done < <(git -C "$WORK" diff --cached --no-renames --name-only -z)
+  git -C "$WORK" diff --cached --check >/dev/null || { echo 'Markdown diff validation failed' >&2; exit 1; }
+  if ! git -C "$WORK" diff --cached --quiet; then
+    git -C "$WORK" -c core.hooksPath=/dev/null commit -m 'Knowledge update via Telegram' >/dev/null
+    [[ "$(git rev-parse HEAD)" == "$BASE" && -z "$(git status --porcelain)" ]] || { echo 'Live KB changed during request; refusing to merge' >&2; exit 73; }
+    git -c core.hooksPath=/dev/null merge --ff-only "$(git -C "$WORK" rev-parse HEAD)" >/dev/null
+    "$SYNC" >/dev/null 2>&1 || { echo 'Knowledge committed locally; GitHub synchronization pending' >&2; exit 2; }
+  fi
+fi
+# READ-side edits disappear with the worktree. Never reset/clean the live KB.
+cp "$TEMP/response.txt" "$OUTPUT"
+cp "$TEMP/events.jsonl" "$JSON_OUTPUT"
+echo "Telegram: $MODE transaction complete" >&2

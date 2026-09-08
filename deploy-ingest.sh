@@ -13,7 +13,7 @@ command -v flock >/dev/null
 command -v pdftotext >/dev/null
 STAGE="$(mktemp -d /opt/knowledge-ingest-stage.XXXXXX)"
 trap 'rm -rf -- "$STAGE"' EXIT
-FILES=(package.json package-lock.json gmail-auth.js gmail-ingest.js run-gmail-ingest.sh run-ingest-write.sh http-puller-service.js http-puller.js)
+FILES=(package.json package-lock.json gmail-auth.js gmail-ingest.js run-gmail-ingest.sh run-ingest-write.sh run-codex-call.sh codex-control.js http-puller-service.js http-puller.js)
 for file in "${FILES[@]}"; do install -m 644 "$SOURCE/$file" "$STAGE/$file"; done
 cp -R "$SOURCE/ingest" "$SOURCE/connectors" "$STAGE/"
 chown -R knowledge:knowledge "$STAGE"
@@ -23,6 +23,8 @@ CONFIG_DIR="$(runuser -u knowledge -- env KNOWLEDGE_ENV_FILE="$APP/.env" node --
 [[ "$STATE_DIR" == /* && "$CONFIG_DIR" == /* ]] || { echo 'Configured state/source directories must be absolute'; exit 1; }
 while IFS= read -r -d '' file; do node --check "$file"; done < <(find "$STAGE/ingest" "$STAGE/connectors" -name '*.js' -print0)
 bash -n "$STAGE/run-ingest-write.sh"
+bash -n "$STAGE/run-codex-call.sh"
+node --check "$STAGE/codex-control.js"
 # Validate configured sources before stopping services. This imports trusted connectors but makes no API calls.
 if [[ -d "$CONFIG_DIR" ]]; then
   runuser -u knowledge -- env KNOWLEDGE_ENV_FILE="$APP/.env" INGEST_SOURCE_DIR="$CONFIG_DIR" node --input-type=module -e \
@@ -44,7 +46,7 @@ done
 if [[ -f "$STATE_DIR/ingest.sqlite" ]]; then cp -a "$STATE_DIR/ingest.sqlite" "$BACKUP/"; fi
 for file in "${FILES[@]}"; do install -o knowledge -g knowledge -m 644 "$STAGE/$file" "$APP/$file"; done
 cp -a "$STAGE/ingest" "$STAGE/connectors" "$STAGE/node_modules" "$APP/"
-chmod 755 "$APP/run-ingest-write.sh" "$APP/run-gmail-ingest.sh"
+chmod 755 "$APP/run-ingest-write.sh" "$APP/run-gmail-ingest.sh" "$APP/run-codex-call.sh"
 mkdir -p "$CONFIG_DIR"
 cp "$SOURCE"/config/sources/*.example.json "$CONFIG_DIR/"
 chown -R knowledge:knowledge "$APP/ingest" "$APP/connectors" "$APP/node_modules" "$CONFIG_DIR" "$STATE_DIR"

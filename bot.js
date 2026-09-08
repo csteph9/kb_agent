@@ -4,6 +4,7 @@ import { spawn } from "child_process";
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
+import { userErrorMessage, relayCodexProgress } from "./codex-control.js";
 
 dotenv.config({
     path: "/opt/knowledge-agent/.env"
@@ -344,6 +345,8 @@ async function runProcess(
 
             let stdout = "";
             let stderr = "";
+            if (args[0] === "/opt/knowledge-agent/run-codex-call.sh") relayCodexProgress(child.stderr);
+            child.stdin?.on("error", () => {});
 
             child.stdout.on(
                 "data",
@@ -376,9 +379,9 @@ async function runProcess(
                         });
                     } else {
                         reject(
-                            new Error(
+                            Object.assign(new Error(
                                 `${command} exited with code ${code}\n${stderr}`
-                            )
+                            ), { exitCode: code })
                         );
                     }
                 }
@@ -448,29 +451,35 @@ or
 WRITE
 `;
 
+    const classifierDir = await fs.mkdtemp(path.join(os.tmpdir(), "knowledge-classifier-"));
+    const classifierOutput = path.join(classifierDir, "answer.txt");
     try {
-        const result =
-            await runProcess(
-                "codex",
+        await runProcess(
+                "bash",
                 [
+                    "/opt/knowledge-agent/run-codex-call.sh",
                     "exec",
+                    "--json",
                     "--ephemeral",
                     "--sandbox",
                     "read-only",
                     "-C",
-                    REPO,
+                    classifierDir,
+                    "--skip-git-repo-check",
+                    "-o",
+                    classifierOutput,
                     "-"
                 ],
                 {
-                    cwd: REPO,
-                    env: process.env,
+                    cwd: classifierDir,
+                    env: { ...process.env, CODEX_CALL_TIMEOUT_SECONDS: process.env.CODEX_CLASSIFIER_TIMEOUT_SECONDS || "120" },
                     stdinData:
                         classifierPrompt
                 }
             );
 
         const answer =
-            result.stdout
+            (await fs.readFile(classifierOutput, "utf8"))
                 .trim()
                 .toUpperCase();
 
@@ -490,6 +499,10 @@ WRITE
             "Intent classification failed:",
             err
         );
+        // Do not immediately launch another model call after a capacity error.
+        throw err;
+    } finally {
+        await fs.rm(classifierDir, { recursive: true, force: true });
     }
 
     return hasAttachment
@@ -650,6 +663,8 @@ personal information, preserve who the information belongs to.
                 );
 
                 let stderr = "";
+                relayCodexProgress(child.stderr);
+                child.stdin.on("error", () => {});
 
                 child.stdout.on(
                     "data",
@@ -683,9 +698,9 @@ personal information, preserve who the information belongs to.
                             resolve();
                         } else {
                             reject(
-                                new Error(
+                                Object.assign(new Error(
                                     `Codex wrapper exited with code ${code}\n${stderr}`
-                                )
+                                ), { exitCode: code })
                             );
                         }
                     }
@@ -997,6 +1012,8 @@ Do not create, edit, delete, rename, or otherwise modify any files.
                 );
 
                 let stderr = "";
+                relayCodexProgress(child.stderr);
+                child.stdin.on("error", () => {});
 
                 child.stdout.on(
                     "data",
@@ -1030,9 +1047,9 @@ Do not create, edit, delete, rename, or otherwise modify any files.
                             resolve();
                         } else {
                             reject(
-                                new Error(
+                                Object.assign(new Error(
                                     `Reminder Codex wrapper exited with code ${code}\n${stderr}`
-                                )
+                                ), { exitCode: code })
                             );
                         }
                     }
@@ -1619,7 +1636,7 @@ Do not store the source image itself in the knowledge repository.
             );
 
             await ctx.reply(
-                "I couldn't process that image."
+                userErrorMessage(err)
             );
         }
     }
@@ -1836,7 +1853,7 @@ ${documentText}
             );
 
             await ctx.reply(
-                "I couldn't process that document."
+                userErrorMessage(err)
             );
         }
     }
@@ -1905,7 +1922,7 @@ bot.on(
             );
 
             await ctx.reply(
-                "Codex encountered an error processing that request."
+                userErrorMessage(err)
             );
         }
     }

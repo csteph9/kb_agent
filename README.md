@@ -376,6 +376,7 @@ sudo cp package.json package-lock.json /opt/knowledge-agent/
 sudo cp -r ingest connectors config docs tests /opt/knowledge-agent/
 sudo cp README.md /opt/knowledge-agent/
 sudo cp run-ingest-write.sh deploy-ingest.sh /opt/knowledge-agent/
+sudo cp run-codex-call.sh codex-control.js deploy-codex.sh /opt/knowledge-agent/
 sudo cp bot.js /opt/knowledge-agent/
 sudo cp gmail-auth.js /opt/knowledge-agent/
 sudo cp gmail-ingest.js /opt/knowledge-agent/
@@ -401,6 +402,7 @@ sudo chmod 755 \
   /opt/knowledge-agent/run-codex.sh \
   /opt/knowledge-agent/run-gmail-ingest.sh \
   /opt/knowledge-agent/run-ingest-write.sh \
+  /opt/knowledge-agent/run-codex-call.sh \
   /opt/knowledge-agent/sync-repo.sh \
   /opt/knowledge-agent/sync.sh
 

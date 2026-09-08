@@ -7,6 +7,7 @@ export KNOWLEDGE_REPO="$TEMP/repo"
 export KNOWLEDGE_REPO_LOCK="$TEMP/repo.lock"
 export KNOWLEDGE_SYNC_SCRIPT="$TEMP/bin/sync"
 export TEST_COUNTER="$TEMP/counter"
+export CODEX_CONTROL_DIR="$TEMP/control" CODEX_MIN_GAP_SECONDS=0
 mkdir -p "$KNOWLEDGE_REPO" "$TEMP/bin"
 export PATH="$TEMP/bin:$PATH"
 # Git Bash has no flock. Stub only for serial transaction tests; Linux exercises real flock.
@@ -20,6 +21,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 printf 'run\n' >>"$TEST_COUNTER"
+echo '{"type":"item.started","item":{"type":"command_execution"}}'
 case "${TEST_MODE:-ok}" in
   fail) echo 'partial change' >fact.md; exit 1 ;;
   protected) echo 'changed rules' >AGENTS.md ;;
@@ -27,6 +29,7 @@ case "${TEST_MODE:-ok}" in
   noop) ;;
   *) echo 'Durable knowledge' >fact.md ;;
 esac
+echo '{"type":"turn.completed"}'
 MOCK
 cat >"$TEMP/bin/sync" <<'MOCK'
 #!/bin/bash
