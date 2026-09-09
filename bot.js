@@ -1915,7 +1915,14 @@ bot.on(
             "typing"
         );
 
-        const statusMessage = await ctx.reply("Searching...");
+        const initialMode = classifyIntentLocally(prompt, false);
+        const statusMessage = await ctx.reply(
+            initialMode === "READ"
+                ? "Searching..."
+                : initialMode === "WRITE"
+                    ? "Updating..."
+                    : "Working..."
+        );
 
         try {
             const response =
@@ -1931,6 +1938,18 @@ bot.on(
                             `${new Date().toISOString()} ` +
                             `text classified ${mode}`
                         );
+
+                        if (mode !== initialMode) {
+                            try {
+                                await ctx.api.editMessageText(
+                                    ctx.chat.id,
+                                    statusMessage.message_id,
+                                    mode === "WRITE" ? "Updating..." : "Searching..."
+                                );
+                            } catch (err) {
+                                console.warn("Could not update Telegram status:", err);
+                            }
+                        }
 
                         return await runCodex(
                             userId,

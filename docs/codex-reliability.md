@@ -49,7 +49,9 @@ later retry a failed KB-only extraction through its existing job mechanism.
 Ambiguous requests stop on classifier CLI failure instead of falling back to
 another immediate Codex call. That classifier runs in an empty read-only
 directory, without KB access. Text requests receive an immediate `Searching...`
-placeholder, which is replaced with the completed answer or error message.
+or `Updating...` placeholder for locally classified requests. Ambiguous requests
+show `Working...` until Luna resolves the intent. The placeholder is then replaced
+with the completed answer or error message.
 
 ## Telegram transactions
 
