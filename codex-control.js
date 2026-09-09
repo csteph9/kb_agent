@@ -93,7 +93,7 @@ export function pinnedCodexArgs(args, profile = 'bulk') {
       throw new Error('Codex model override rejected');
     }
   }
-  const model = profile === 'classifier' ? 'o4-mini' : 'gpt-5.6-sol';
+  const model = profile === 'classifier' ? 'gpt-5.6-luna' : 'gpt-5.6-sol';
   return [
     ...args.slice(0, execIndex),
     '--model', model,

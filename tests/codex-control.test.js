@@ -109,12 +109,12 @@ test('bulk invocations are pinned to GPT-5.6 Sol with medium reasoning', () => {
   assert.throws(() => pinnedCodexArgs(['--model', 'other', 'exec']), /override rejected/);
   assert.throws(() => pinnedCodexArgs(['-c', 'model_reasoning_effort="high"', 'exec']), /override rejected/);
 });
-test('classifier invocations are explicitly pinned to o4-mini', () => {
+test('classifier invocations are explicitly pinned to GPT-5.6 Luna', () => {
   const selected = callProfile(['--knowledge-call-profile=classifier', 'exec', '--json', '-']);
   assert.equal(selected.profile, 'classifier');
   assert.deepEqual(selected.args, ['exec', '--json', '-']);
   assert.deepEqual(pinnedCodexArgs(selected.args, selected.profile), [
-    '--model', 'o4-mini',
+    '--model', 'gpt-5.6-luna',
     '-c', 'model_reasoning_effort="medium"',
     '-c', 'features.multi_agent=false', 'exec', '--json', '-'
   ]);

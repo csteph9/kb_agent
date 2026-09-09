@@ -37,7 +37,7 @@ Application calls set `features.multi_agent=false` so research runs cannot use
 Codex's subagent tools to fan out requests. This does not rate-limit individual
 HTTP requests or hosted tools inside a Codex turn and cannot prevent a general
 provider capacity outage. Intent classification is explicitly pinned to
-`o4-mini`; all bulk work is pinned to `gpt-5.6-sol`. Both profiles use
+`gpt-5.6-luna`; all bulk work is pinned to `gpt-5.6-sol`. Both profiles use
 `model_reasoning_effort="medium"`. Bulk work includes Telegram answers and
 edits, resumed sessions, reminders, and ingestion. Conflicting model arguments
 are rejected rather than silently overriding the application-selected pin.
