@@ -36,10 +36,11 @@ Calls outside these application wrappers are not covered by this gate.
 Application calls set `features.multi_agent=false` so research runs cannot use
 Codex's subagent tools to fan out requests. This does not rate-limit individual
 HTTP requests or hosted tools inside a Codex turn and cannot prevent a general
-provider capacity outage. Every application-owned call is explicitly pinned to
-model `gpt-5.6-sol` with `model_reasoning_effort="medium"`, including Telegram,
-resumed sessions, classification, reminders, and ingestion. Conflicting model
-arguments are rejected rather than silently overriding the pin.
+provider capacity outage. Intent classification is explicitly pinned to
+`o4-mini`; all bulk work is pinned to `gpt-5.6-sol`. Both profiles use
+`model_reasoning_effort="medium"`. Bulk work includes Telegram answers and
+edits, resumed sessions, reminders, and ingestion. Conflicting model arguments
+are rejected rather than silently overriding the application-selected pin.
 
 Retries examine JSON error events rather than matching agent prose. Once any
 tool may have run, the controller will not automatically replay the whole

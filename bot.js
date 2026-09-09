@@ -458,6 +458,7 @@ WRITE
                 "bash",
                 [
                     "/opt/knowledge-agent/run-codex-call.sh",
+                    "--knowledge-call-profile=classifier",
                     "exec",
                     "--json",
                     "--ephemeral",

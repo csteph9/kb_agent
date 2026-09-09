@@ -74,7 +74,16 @@ export function observeEvent(state, event) {
   if (event.type?.startsWith('item.') && !['reasoning', 'agent_message', 'plan'].includes(event.item?.type)) state.tools = true;
 }
 
-export function pinnedCodexArgs(args) {
+export function callProfile(args) {
+  const prefix = '--knowledge-call-profile=';
+  const profiles = args.filter(arg => arg.startsWith(prefix));
+  if (profiles.length > 1) throw new Error('Duplicate Codex call profile');
+  const profile = profiles.length ? profiles[0].slice(prefix.length) : 'bulk';
+  if (!['bulk', 'classifier'].includes(profile)) throw new Error('Invalid Codex call profile');
+  return { profile, args: args.filter(arg => !arg.startsWith(prefix)) };
+}
+
+export function pinnedCodexArgs(args, profile = 'bulk') {
   const execIndex = args.indexOf('exec');
   if (execIndex < 0) throw new Error('Codex exec subcommand required');
   for (let i = 0; i < args.length; i++) {
@@ -84,9 +93,10 @@ export function pinnedCodexArgs(args) {
       throw new Error('Codex model override rejected');
     }
   }
+  const model = profile === 'classifier' ? 'o4-mini' : 'gpt-5.6-sol';
   return [
     ...args.slice(0, execIndex),
-    '--model', 'gpt-5.6-sol',
+    '--model', model,
     '-c', 'model_reasoning_effort="medium"',
     '-c', 'features.multi_agent=false',
     ...args.slice(execIndex),
@@ -146,7 +156,8 @@ export async function controlledRun({ config, readState, writeState, invoke, log
 
 async function main() {
   process.umask(0o077);
-  const args = process.argv.slice(2);
+  const selected = callProfile(process.argv.slice(2));
+  const args = selected.args;
   if (!args.includes('--json')) throw new Error('Codex calls require --json');
   const dir = process.env.CODEX_CONTROL_DIR;
   if (!dir) throw new Error('Use run-codex-call.sh to acquire the execution lock');
@@ -168,7 +179,7 @@ async function main() {
         await fs.rename(stateFile + '.tmp', stateFile);
       },
       // Pin every application-owned call, including resumed sessions.
-      invoke: () => attempt(pinnedCodexArgs(args), prompt, output),
+      invoke: () => attempt(pinnedCodexArgs(args, selected.profile), prompt, output),
       log: message => console.error(message),
     });
     // Earlier thread.started events must not become the saved session ID.
