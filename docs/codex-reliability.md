@@ -9,7 +9,7 @@ Defaults:
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `CODEX_MIN_GAP_SECONDS` | 10 | Wait after the previous CLI call finishes before starting another |
+| `CODEX_MIN_GAP_SECONDS` | 1 | Wait after the previous CLI call finishes before starting another |
 | `CODEX_MAX_ATTEMPTS` | 3 | At most three CLI launches for one request |
 | `CODEX_RETRY_BASE_SECONDS` | 30 | First transient retry delay |
 | `CODEX_RETRY_MAX_SECONDS` | 120 | Cap on exponential delay, excluding server hints |
@@ -36,18 +36,20 @@ Calls outside these application wrappers are not covered by this gate.
 Application calls set `features.multi_agent=false` so research runs cannot use
 Codex's subagent tools to fan out requests. This does not rate-limit individual
 HTTP requests or hosted tools inside a Codex turn and cannot prevent a general
-provider capacity outage. Intent classification is explicitly pinned to
-`gpt-5.6-luna`; all bulk work is pinned to `gpt-5.6-sol`. Both profiles use
-`model_reasoning_effort="medium"`. Bulk work includes Telegram answers and
-edits, resumed sessions, reminders, and ingestion. Conflicting model arguments
-are rejected rather than silently overriding the application-selected pin.
+provider capacity outage. READ answers and ambiguous intent classification are
+pinned to `gpt-5.6-luna` with low reasoning. WRITE operations and ingestion are
+pinned to `gpt-5.6-sol` with medium reasoning. High-confidence requests are
+classified locally; Luna is used only when the wording is ambiguous. Conflicting
+model arguments are rejected rather than overriding the application-selected pin.
 
 Retries examine JSON error events rather than matching agent prose. Once any
 tool may have run, the controller will not automatically replay the whole
 turn, since tools can have external side effects. The ingestion queue may
 later retry a failed KB-only extraction through its existing job mechanism.
-The classifier now stops on CLI failure instead of falling back to another
-immediate Codex call. It runs in an empty read-only directory, without KB access.
+Ambiguous requests stop on classifier CLI failure instead of falling back to
+another immediate Codex call. That classifier runs in an empty read-only
+directory, without KB access. Text requests receive an immediate `Searching...`
+placeholder, which is replaced with the completed answer or error message.
 
 ## Telegram transactions
 
@@ -76,7 +78,7 @@ sudo journalctl -u knowledge-agent.service -u knowledge-ingest.service -n 80 --n
 ```
 
 The deployment validates scripts, pauses the ingestion timer, waits for the
-current repository transaction, stops the workers, backs up the five changed
+current repository transaction, stops the workers, backs up the changed
 runtime files, and installs them together. It restores the previously active
 agent and timer. It preserves `.env`, OAuth files, sessions, and KB data. If a
 copy fails partway through, inspect the backup and rerun; there is no automatic

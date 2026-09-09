@@ -24,7 +24,7 @@ test('success preserves pacing across separate calls', async () => {
   const f = fixture([ok, ok]);
   assert.equal(await f.run(), 0);
   assert.equal(await f.run(), 0);
-  assert.deepEqual(f.waits, [10000]);
+  assert.deepEqual(f.waits, [1000]);
 });
 test('transient failures back off, then recover within three attempts', async () => {
   const f = fixture([busy, busy, ok]);
@@ -115,7 +115,7 @@ test('classifier invocations are explicitly pinned to GPT-5.6 Luna', () => {
   assert.deepEqual(selected.args, ['exec', '--json', '-']);
   assert.deepEqual(pinnedCodexArgs(selected.args, selected.profile), [
     '--model', 'gpt-5.6-luna',
-    '-c', 'model_reasoning_effort="medium"',
+    '-c', 'model_reasoning_effort="low"',
     '-c', 'features.multi_agent=false', 'exec', '--json', '-'
   ]);
   assert.equal(callProfile(['exec']).profile, 'bulk');
@@ -123,4 +123,12 @@ test('classifier invocations are explicitly pinned to GPT-5.6 Luna', () => {
   assert.throws(() => callProfile([
     '--knowledge-call-profile=classifier', '--knowledge-call-profile=bulk', 'exec'
   ]), /Duplicate/);
+});
+test('READ answer invocations use GPT-5.6 Luna with low reasoning', () => {
+  const selected = callProfile(['--knowledge-call-profile=answer', 'exec', '--json', '-']);
+  assert.deepEqual(pinnedCodexArgs(selected.args, selected.profile), [
+    '--model', 'gpt-5.6-luna',
+    '-c', 'model_reasoning_effort="low"',
+    '-c', 'features.multi_agent=false', 'exec', '--json', '-'
+  ]);
 });

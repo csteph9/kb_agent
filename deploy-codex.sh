@@ -6,7 +6,7 @@ umask 077
 SOURCE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 APP=/opt/knowledge-agent
 [[ "$SOURCE" != "$APP" && -f "$APP/.env" ]] || { echo 'Use a separate checkout and an existing KB installation'; exit 1; }
-FILES=(bot.js run-codex.sh run-ingest-write.sh run-codex-call.sh codex-control.js)
+FILES=(bot.js intent-classifier.js run-codex.sh run-ingest-write.sh run-codex-call.sh codex-control.js)
 for file in "${FILES[@]}"; do
   [[ -f "$SOURCE/$file" ]] || { echo "Missing $file"; exit 1; }
   case "$file" in *.js) node --check "$SOURCE/$file" ;; *.sh) bash -n "$SOURCE/$file" ;; esac

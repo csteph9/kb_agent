@@ -51,7 +51,7 @@ function numberSetting(env, key, fallback, min, max) {
 
 export function settings(env = process.env) {
   return {
-    gap: numberSetting(env, 'CODEX_MIN_GAP_SECONDS', 10, 0, 3600) * 1000,
+    gap: numberSetting(env, 'CODEX_MIN_GAP_SECONDS', 1, 0, 3600) * 1000,
     attempts: numberSetting(env, 'CODEX_MAX_ATTEMPTS', 3, 1, 5),
     backoff: numberSetting(env, 'CODEX_RETRY_BASE_SECONDS', 30, 1, 3600) * 1000,
     maxBackoff: numberSetting(env, 'CODEX_RETRY_MAX_SECONDS', 120, 1, 3600) * 1000,
@@ -79,7 +79,7 @@ export function callProfile(args) {
   const profiles = args.filter(arg => arg.startsWith(prefix));
   if (profiles.length > 1) throw new Error('Duplicate Codex call profile');
   const profile = profiles.length ? profiles[0].slice(prefix.length) : 'bulk';
-  if (!['bulk', 'classifier'].includes(profile)) throw new Error('Invalid Codex call profile');
+  if (!['bulk', 'answer', 'classifier'].includes(profile)) throw new Error('Invalid Codex call profile');
   return { profile, args: args.filter(arg => !arg.startsWith(prefix)) };
 }
 
@@ -93,11 +93,13 @@ export function pinnedCodexArgs(args, profile = 'bulk') {
       throw new Error('Codex model override rejected');
     }
   }
-  const model = profile === 'classifier' ? 'gpt-5.6-luna' : 'gpt-5.6-sol';
+  const lightweight = profile === 'classifier' || profile === 'answer';
+  const model = lightweight ? 'gpt-5.6-luna' : 'gpt-5.6-sol';
+  const reasoning = lightweight ? 'low' : 'medium';
   return [
     ...args.slice(0, execIndex),
     '--model', model,
-    '-c', 'model_reasoning_effort="medium"',
+    '-c', `model_reasoning_effort="${reasoning}"`,
     '-c', 'features.multi_agent=false',
     ...args.slice(execIndex),
   ];

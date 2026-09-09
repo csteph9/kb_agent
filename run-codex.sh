@@ -37,7 +37,9 @@ git worktree add --detach "$WORK" "$BASE" >/dev/null 2>&1
 } >"$TEMP/prompt.txt"
 # Override cwd and sandbox for new AND resumed conversations. Old session
 # metadata must not point execution back at the live checkout.
-ARGS=(-C "$WORK" -c 'sandbox_mode="workspace-write"' -c 'sandbox_workspace_write.writable_roots=[]' exec)
+PROFILE=bulk
+[[ "$MODE" != READ ]] || PROFILE=answer
+ARGS=("--knowledge-call-profile=$PROFILE" -C "$WORK" -c 'sandbox_mode="workspace-write"' -c 'sandbox_workspace_write.writable_roots=[]' exec)
 if [[ -n "$SESSION_ID" ]]; then ARGS+=(resume "$SESSION_ID"); fi
 ARGS+=(--json -o "$TEMP/response.txt")
 if [[ -n "$IMAGE" ]]; then ARGS+=(--image "$IMAGE"); fi

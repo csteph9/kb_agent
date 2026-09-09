@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 import { userErrorMessage, relayCodexProgress } from "./codex-control.js";
+import { classifyIntentLocally } from "./intent-classifier.js";
 
 dotenv.config({
     path: "/opt/knowledge-agent/.env"
@@ -407,6 +408,14 @@ async function classifyIntent(
     userText,
     hasAttachment = false
 ) {
+    const localMode = classifyIntentLocally(userText, hasAttachment);
+    if (localMode) {
+        console.log(
+            `${new Date().toISOString()} intent classified ${localMode} locally`
+        );
+        return localMode;
+    }
+
     const classifierPrompt = `
 Classify the user's request as exactly READ or WRITE.
 
@@ -1133,6 +1142,25 @@ async function sendTelegramMessage(chatId, message) {
                 start,
                 start + TELEGRAM_MESSAGE_CHUNK_SIZE
             )
+        );
+    }
+}
+
+async function replaceTelegramStatus(chatId, messageId, message) {
+    const text = message || "Done.";
+    await bot.api.editMessageText(
+        chatId,
+        messageId,
+        text.slice(0, TELEGRAM_MESSAGE_CHUNK_SIZE)
+    );
+    for (
+        let start = TELEGRAM_MESSAGE_CHUNK_SIZE;
+        start < text.length;
+        start += TELEGRAM_MESSAGE_CHUNK_SIZE
+    ) {
+        await bot.api.sendMessage(
+            chatId,
+            text.slice(start, start + TELEGRAM_MESSAGE_CHUNK_SIZE)
         );
     }
 }
@@ -1887,6 +1915,8 @@ bot.on(
             "typing"
         );
 
+        const statusMessage = await ctx.reply("Searching...");
+
         try {
             const response =
                 await enqueue(
@@ -1911,9 +1941,10 @@ bot.on(
                     }
                 );
 
-            await ctx.reply(
-                response ||
-                "Done."
+            await replaceTelegramStatus(
+                ctx.chat.id,
+                statusMessage.message_id,
+                response || "Done."
             );
 
         } catch (err) {
@@ -1922,7 +1953,9 @@ bot.on(
                 err
             );
 
-            await ctx.reply(
+            await replaceTelegramStatus(
+                ctx.chat.id,
+                statusMessage.message_id,
                 userErrorMessage(err)
             );
         }
