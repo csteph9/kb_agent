@@ -64,7 +64,7 @@ if [[ "$MODE" == WRITE ]]; then
     esac
     [[ ! -L "$WORK/$file" ]] || { echo 'Symlink changes rejected' >&2; exit 1; }
   done < <(git -C "$WORK" diff --cached --no-renames --name-only -z)
-  git -C "$WORK" diff --cached --check >/dev/null || { echo 'Markdown diff validation failed' >&2; exit 1; }
+  git -C "$WORK" diff --cached --check || { echo 'Markdown diff validation failed' >&2; exit 1; }
   if ! git -C "$WORK" diff --cached --quiet; then
     git -C "$WORK" -c core.hooksPath=/dev/null commit -m 'Knowledge update via Telegram' >/dev/null
     [[ "$(git rev-parse HEAD)" == "$BASE" && -z "$(git status --porcelain)" ]] || { echo 'Live KB changed during request; refusing to merge' >&2; exit 73; }
