@@ -1,0 +1,13 @@
+[Unit]
+Description=Clean stale Knowledge Agent HTTP responses
+
+[Service]
+Type=oneshot
+User=knowledge
+Group=knowledge
+
+EnvironmentFile=-/opt/knowledge-agent/.env
+Environment=HOME=/home/knowledge
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+ExecStart=/usr/bin/node /opt/knowledge-agent/http-puller-cleanup.js

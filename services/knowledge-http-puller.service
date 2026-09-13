@@ -1,5 +1,7 @@
 [Unit]
 Description=Knowledge Agent HTTP Puller
+StartLimitIntervalSec=60
+StartLimitBurst=30
 
 [Service]
 Type=oneshot

@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodically clean stale Knowledge Agent HTTP responses
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+Persistent=true
+Unit=knowledge-http-puller-cleanup.service
+
+[Install]
+WantedBy=timers.target

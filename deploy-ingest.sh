@@ -13,7 +13,7 @@ command -v flock >/dev/null
 command -v pdftotext >/dev/null
 STAGE="$(mktemp -d /opt/knowledge-ingest-stage.XXXXXX)"
 trap 'rm -rf -- "$STAGE"' EXIT
-FILES=(package.json package-lock.json gmail-auth.js gmail-ingest.js run-gmail-ingest.sh run-ingest-write.sh run-codex-call.sh codex-control.js http-puller-service.js http-puller.js)
+FILES=(package.json package-lock.json gmail-auth.js gmail-ingest.js run-gmail-ingest.sh run-ingest-write.sh run-codex-call.sh codex-control.js http-puller-service.js http-puller-cleanup.js http-puller.js)
 for file in "${FILES[@]}"; do install -m 644 "$SOURCE/$file" "$STAGE/$file"; done
 cp -R "$SOURCE/ingest" "$SOURCE/connectors" "$STAGE/"
 chown -R knowledge:knowledge "$STAGE"
@@ -58,10 +58,16 @@ if ! runuser -u knowledge -- node --input-type=module -e \
 fi
 install -m 644 "$SOURCE/services/knowledge-ingest.service" /etc/systemd/system/
 install -m 644 "$SOURCE/services/knowledge-ingest.timer" /etc/systemd/system/
+install -m 644 "$SOURCE/services/knowledge-http-puller.service" /etc/systemd/system/
+install -m 644 "$SOURCE/services/knowledge-http-puller.path" /etc/systemd/system/
+install -m 644 "$SOURCE/services/knowledge-http-puller-cleanup.service" /etc/systemd/system/
+install -m 644 "$SOURCE/services/knowledge-http-puller-cleanup.timer" /etc/systemd/system/
 systemctl daemon-reload
 systemctl disable knowledge-gmail-ingest.timer 2>/dev/null || true
 flock -u 8
 systemctl enable --now knowledge-ingest.timer
+systemctl reset-failed knowledge-http-puller.service knowledge-http-puller.path 2>/dev/null || true
+systemctl enable --now knowledge-http-puller.path knowledge-http-puller-cleanup.timer
 echo "Ingestion deployed. Application backup: $BACKUP"
 echo 'Inspect: sudo -u knowledge node /opt/knowledge-agent/ingest/cli.js status'
 echo 'Logs: journalctl -u knowledge-ingest.service -n 50 --no-pager'

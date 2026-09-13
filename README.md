@@ -805,6 +805,14 @@ controlled HTTP bridge.
 It is triggered on demand by `knowledge-http-puller.path`; it does not
 need to remain running continuously.
 
+## `knowledge-http-puller-cleanup.timer`
+
+Removes orphaned `.response`, `.json`, `.error`, and temporary response
+artifacts after one hour. Pending files under `requests/` are never removed.
+Override the one-hour retention period with
+`HTTP_PULLER_RESPONSE_TTL_SECONDS` in `.env` (minimum 60 seconds, maximum
+seven days).
+
 ## Generic ingestion service and timer
 
 `knowledge-ingest.service` runs configured sources through the shared ingestion
@@ -825,6 +833,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now knowledge-agent.service
 sudo systemctl enable --now knowledge-sync.timer
 sudo systemctl enable --now knowledge-http-puller.path
+sudo systemctl enable --now knowledge-http-puller-cleanup.timer
 # Optional, after Gmail OAuth setup:
 # sudo systemctl enable --now knowledge-ingest.timer
 ```
