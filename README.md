@@ -675,6 +675,7 @@ REMINDER_TIME=08:00
 REMINDER_FILE=reminders.md
 REMINDER_WEATHER_LOCATION=San Francisco, CA
 REMINDER_NEWS_FEEDS=https://feeds.bbci.co.uk/news/rss.xml,https://feeds.npr.org/1001/rss.xml,https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml
+MORNING_SCHEDULE_REFRESH=true
 GMAIL_ENABLED=false
 GMAIL_STATE_DIR=/opt/knowledge-agent/gmail
 GMAIL_QUERY=newer_than:14d -category:promotions -category:social
@@ -718,6 +719,16 @@ not use or expose more precise location details.
 
 `REMINDER_NEWS_FEEDS` is a comma-separated list of public RSS feed URLs.
 The default uses BBC, NPR, and The New York Times headline feeds.
+
+`MORNING_SCHEDULE_REFRESH` defaults to `true`. Before producing the daily
+morning report, the agent performs one WRITE transaction that discovers
+schedule-related resources from the knowledge base itself, refreshes them, and
+reconciles new, changed, or explicitly cancelled events into the KB. Personal
+source names and URLs remain in the private KB; they do not need to be copied
+into `.env` or `config/sources`. The subsequent READ-only report includes
+relevant changes and identifies refresh failures so stale schedule information
+is not silently presented as current. Set the value to `off` to skip this
+pre-report refresh.
 
 If reminders are due, the message also includes a reminder list.
 Date-specific reminders are included 7 days before, 2 days before, and
