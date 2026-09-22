@@ -233,16 +233,22 @@ reminder file.
 When adding or updating reminders:
 
 1. Search for an existing reminder before creating a duplicate.
-2. Preserve the user's requested timing clearly.
-3. Use ISO dates in the form YYYY-MM-DD for date-specific reminders.
-4. Mark ongoing reminders as recurring, continual, daily, weekly, monthly, or
+2. Add an explicit `Recipients` field naming one or more people or
+   `Household`. Interpret first-person references using the current-user
+   identity supplied by the application. A reminder's creator is not
+   automatically its recipient.
+3. Add a `Created by` field when the creator is known, especially when one
+   person creates a reminder for another person.
+4. Preserve the user's requested timing clearly.
+5. Use ISO dates in the form YYYY-MM-DD for date-specific reminders.
+6. Mark ongoing reminders as recurring, continual, daily, weekly, monthly, or
    with another clear cadence.
-5. Include enough context for the scheduled Telegram reminder check to decide
+7. Include enough context for the scheduled Telegram reminder check to decide
    whether the reminder should be sent 7 days before, 2 days before, on the
    day of, or as an active recurring/continual reminder.
-6. Include useful preparation context when known, such as what the user should
+8. Include useful preparation context when known, such as what the user should
    bring, review, book, buy, or watch for.
-7. Remove or mark completed reminders only when the user asks or the reminder
+9. Remove or mark completed reminders only when the user asks or the reminder
    explicitly says it should happen once and has already been fulfilled.
 
 The scheduled reminder check reads the reminder file and sends only reminders
@@ -253,6 +259,12 @@ current news headlines when those can be retrieved from configured public
 sources. It should not invent real-world facts such as weather, travel
 conditions, or news headlines. If no reminders match the timing rules, omit
 the reminder list entirely.
+
+Reminder delivery is recipient-scoped. Include a reminder only for a person
+named in its `Recipients` field or when that field says `Household`. Never send
+a reminder addressed only to somebody else. For backward compatibility,
+existing reminders without a `Recipients` field are legacy household
+reminders; add explicit recipient metadata whenever such an entry is updated.
 
 Weather and news retrieved for the scheduled ping are temporary context for
 that message. Do not store daily weather or news headlines in the knowledge

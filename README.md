@@ -236,6 +236,7 @@ The application distribution contains:
 |-- .gitignore
 |-- README.md
 |-- bot.js
+|-- notification-routing.js
 |-- config/
 |   \-- sources/
 |       |-- personal-gmail.example.json
@@ -377,7 +378,7 @@ sudo cp -r ingest connectors config docs tests /opt/knowledge-agent/
 sudo cp README.md /opt/knowledge-agent/
 sudo cp run-ingest-write.sh deploy-ingest.sh /opt/knowledge-agent/
 sudo cp run-codex-call.sh codex-control.js deploy-codex.sh /opt/knowledge-agent/
-sudo cp bot.js /opt/knowledge-agent/
+sudo cp bot.js intent-classifier.js notification-routing.js /opt/knowledge-agent/
 sudo cp gmail-auth.js /opt/knowledge-agent/
 sudo cp gmail-ingest.js /opt/knowledge-agent/
 sudo cp http-puller.js /opt/knowledge-agent/
@@ -691,11 +692,33 @@ For multiple people:
 ``` text
 TELEGRAM_ALLOWED_USER_IDS=123456789,987654321
 TELEGRAM_USER_NAMES=123456789:Alice,987654321:Bob
+TELEGRAM_USER_ALIASES=wife:123456789,husband:987654321
 ```
 
 `TELEGRAM_ALLOWED_USER_IDS` is the authorization boundary.
 `TELEGRAM_USER_NAMES` gives Codex human identity context so first-person
 statements can be attributed correctly.
+
+`TELEGRAM_USER_ALIASES` is an optional comma-separated `alias:user-id` map for
+targeted reminders and messages. Each ID must also appear in
+`TELEGRAM_ALLOWED_USER_IDS`. Names and aliases are matched case-insensitively;
+use unique aliases within the household.
+
+Authorized users can create recipient-scoped reminders and send immediate
+messages to another configured user:
+
+``` text
+/remind me Friday to call Mom
+/remind my wife 2026-09-25 to renew her passport
+/remind household tomorrow to take out the bins
+/send Alice Dinner moved to 6:30
+```
+
+Every new reminder records `Recipients` and `Created by`. Scheduled delivery
+includes reminders addressed to the current recipient or `Household`; legacy
+entries without recipient metadata remain household reminders. `/send` only
+accepts configured names or aliases and identifies the sender in the delivered
+message. The recipient must have started the Telegram bot previously.
 
 `REMINDER_TIME` enables the daily reminder check. Use `HH:MM` in the
 server's local 24-hour time, for example `08:00`. Set it to `off` to
@@ -1295,7 +1318,8 @@ A healthy installation has:
 -   GitHub fetch **and push** working as `knowledge`.
 -   Codex installed and authenticated as `knowledge`.
 -   `/opt/knowledge-agent/.env` owned by `knowledge` and mode `600`.
--   Telegram `/start`, `/status`, `/new`, `/sync`, and `/help` working.
+-   Telegram `/start`, `/status`, `/new`, `/sync`, `/remind`, `/send`, and
+    `/help` working.
 -   READ requests producing no Git commits.
 -   WRITE requests producing appropriate Markdown commits.
 -   Agent commits reaching GitHub.

@@ -6,6 +6,11 @@ import os from "os";
 import path from "path";
 import { userErrorMessage, relayCodexProgress } from "./codex-control.js";
 import { classifyIntentLocally } from "./intent-classifier.js";
+import {
+    parseUserAliases,
+    resolveRecipientPrefix,
+    validateRecipientDirectory
+} from "./notification-routing.js";
 
 dotenv.config({
     path: "/opt/knowledge-agent/.env"
@@ -48,6 +53,11 @@ const TELEGRAM_USER_NAMES = new Map(
             ];
         })
         .filter(([id]) => Number.isFinite(id))
+);
+
+const TELEGRAM_USER_ALIASES = parseUserAliases(
+    process.env.TELEGRAM_USER_ALIASES || "",
+    ALLOWED_USER_IDS
 );
 
 const REPO = "/home/knowledge/repo";
@@ -150,6 +160,56 @@ function allowedUserIds() {
         (a, b) => a - b
     );
 }
+
+function configuredUsers() {
+    return new Map(
+        allowedUserIds().map(
+            userId => [
+                userId,
+                userNameFor(userId)
+            ]
+        )
+    );
+}
+
+function resolveCommandRecipient(
+    value,
+    senderUserId,
+    allowHousehold = false
+) {
+    return resolveRecipientPrefix(
+        value,
+        senderUserId,
+        configuredUsers(),
+        TELEGRAM_USER_ALIASES,
+        { allowHousehold }
+    );
+}
+
+function recipientDirectoryForPrompt() {
+    const aliasesByUser = new Map();
+
+    for (const [alias, userId] of TELEGRAM_USER_ALIASES) {
+        const existing = aliasesByUser.get(userId) || [];
+        existing.push(alias);
+        aliasesByUser.set(userId, existing);
+    }
+
+    return allowedUserIds()
+        .map(userId => {
+            const aliases = aliasesByUser.get(userId) || [];
+            return `- ${userNameFor(userId)}` +
+                (aliases.length
+                    ? ` (aliases: ${aliases.join(", ")})`
+                    : "");
+        })
+        .join("\n");
+}
+
+validateRecipientDirectory(
+    configuredUsers(),
+    TELEGRAM_USER_ALIASES
+);
 
 
 // ---------------------------------------------------------------------------
@@ -653,6 +713,14 @@ as referring to ${currentUserName}.
 Do not assume that information belonging to another person in the
 shared knowledge base belongs to ${currentUserName}. When storing
 personal information, preserve who the information belongs to.
+
+Configured reminder/message recipients:
+
+${recipientDirectoryForPrompt()}
+
+When the user creates a reminder for a configured name or alias, store
+the canonical configured name in its Recipients field. Use Household
+only when the user explicitly asks for a household/shared reminder.
 `;
 
         const finalPrompt =
@@ -1114,6 +1182,15 @@ Current recipient:
 
 Name: ${currentUserName}
 Telegram user ID: ${userId}
+
+Reminder audience rules:
+
+- Include a reminder with a Recipients field only when that field names
+  ${currentUserName}, names Telegram user ID ${userId}, or says Household.
+- Never include a reminder addressed only to another person.
+- Treat a reminder without recipient metadata as a legacy household
+  reminder that may be included for every recipient.
+- The person who created a reminder is not automatically its recipient.
 
 Morning schedule-resource refresh:
 
@@ -1681,8 +1758,110 @@ bot.command(
 /status — Show your conversation session status
 /new — Start a new conversation session
 /sync — Force an immediate GitHub sync/rebase
+/remind PERSON REQUEST — Create a reminder for a person or household
+/send PERSON MESSAGE — Immediately send a message to a person
 /help — Show this help`
         );
+    }
+);
+
+
+bot.command(
+    "remind",
+    async ctx => {
+        const senderUserId = ctx.from.id;
+        const target = resolveCommandRecipient(
+            ctx.match,
+            senderUserId,
+            true
+        );
+
+        if (!target || !target.body) {
+            await ctx.reply(
+                "Usage: /remind PERSON REQUEST\n" +
+                "Examples: /remind me Friday to call Mom; " +
+                "/remind Alice 2026-09-25 to renew her passport; " +
+                "/remind household tomorrow to take out the bins."
+            );
+            return;
+        }
+
+        const creatorName = userNameFor(senderUserId);
+        const statusMessage = await ctx.reply("Updating...");
+
+        try {
+            const response = await enqueue(
+                async () => await runCodex(
+                    senderUserId,
+                    `Create or update a reminder from the request below.\n\n` +
+                    `Recipients: ${target.name}\n` +
+                    `Created by: ${creatorName}\n` +
+                    `Reminder request: ${target.body}\n\n` +
+                    `Store the Recipients and Created by fields explicitly in ` +
+                    `the reminder entry. Do not change the recipient based on ` +
+                    `pronouns or names inside the reminder message. Preserve ` +
+                    `the requested timing and follow the reminder rules in ` +
+                    `AGENTS.md.`,
+                    null,
+                    "WRITE"
+                )
+            );
+
+            await replaceTelegramStatus(
+                ctx.chat.id,
+                statusMessage.message_id,
+                response || `Reminder saved for ${target.name}.`
+            );
+        } catch (err) {
+            console.error("Targeted reminder failed:", err);
+            await replaceTelegramStatus(
+                ctx.chat.id,
+                statusMessage.message_id,
+                userErrorMessage(err)
+            );
+        }
+    }
+);
+
+
+bot.command(
+    "send",
+    async ctx => {
+        const senderUserId = ctx.from.id;
+        const target = resolveCommandRecipient(
+            ctx.match,
+            senderUserId,
+            false
+        );
+
+        if (!target || !target.body) {
+            await ctx.reply(
+                "Usage: /send PERSON MESSAGE\n" +
+                "Example: /send Alice Dinner moved to 6:30."
+            );
+            return;
+        }
+
+        const senderName = userNameFor(senderUserId);
+        const outbound =
+            `Message from ${senderName} via the knowledge agent:\n\n` +
+            target.body;
+
+        try {
+            await sendTelegramMessage(target.userId, outbound);
+            console.log(
+                `${new Date().toISOString()} targeted message ` +
+                `from Telegram user ${senderUserId} ` +
+                `to Telegram user ${target.userId}`
+            );
+            await ctx.reply(`Sent to ${target.name}.`);
+        } catch (err) {
+            console.error("Targeted message delivery failed:", err);
+            await ctx.reply(
+                `I couldn't deliver that message to ${target.name}. ` +
+                `They may need to open the bot and send /start first.`
+            );
+        }
     }
 );
 
@@ -2276,6 +2455,14 @@ await bot.api.setMyCommands([
     {
         command: "sync",
         description: "Force GitHub synchronization"
+    },
+    {
+        command: "remind",
+        description: "Create a reminder for a person"
+    },
+    {
+        command: "send",
+        description: "Immediately message a person"
     },
     {
         command: "help",

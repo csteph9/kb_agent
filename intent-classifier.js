@@ -3,7 +3,8 @@ const writePatterns = [
   /^(?:please\s+)?(?:record|save|store|note down)\b/,
   /^(?:please\s+)?(?:add|update|change|correct|delete|remove|forget|edit|modify|organize|move|rename)\b/,
   /^(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:record|save|store|add|update|change|correct|delete|remove|forget|edit|modify|organize|move|rename)\b/,
-  /^(?:please\s+)?remind me\b/,
+  /^(?:please\s+)?remind\b/,
+  /^(?:please\s+)?set (?:a|an) reminder\b/,
   /^(?:please\s+)?process (?:my|the) inbox\b/,
 ];
 

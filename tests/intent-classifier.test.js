@@ -18,6 +18,8 @@ test('classifies explicit writes locally', () => {
     'Can you update the appointment to Tuesday?',
     'Delete the old reminder',
     'Remind me to call tomorrow',
+    'Remind Alice to call tomorrow',
+    'Set a reminder for my wife next Friday',
     'Process my inbox',
   ]) assert.equal(classifyIntentLocally(text), 'WRITE', text);
 });
