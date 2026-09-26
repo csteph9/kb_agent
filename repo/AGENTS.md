@@ -299,7 +299,10 @@ For calendar changes:
 
 1. Resolve the configured calendar source and calendar with the read tools.
 2. Search for possible duplicates before creating an event.
-3. Use a stable, request-specific idempotency key when creating an event.
+3. Use a stable, request-specific idempotency key when creating an event. For
+   bulk creation, give each event a distinct key derived from the request ID and
+   its stable source-event identifier so retries do not duplicate or collapse
+   events.
 4. Fetch the current event immediately before updating or deleting it and pass
    its current ETag. If the event changed, fetch it again rather than forcing
    an overwrite.

@@ -23,6 +23,7 @@ test('classifies explicit writes locally', () => {
     'Schedule a dentist appointment next Tuesday',
     'Reschedule the team meeting to 3 PM',
     'Cancel the calendar event tomorrow',
+    'Sync all of my travel events and NHL Sharks games to my gcal',
     'Process my inbox',
   ]) assert.equal(classifyIntentLocally(text), 'WRITE', text);
 });
@@ -40,6 +41,9 @@ test('enables calendar tools only for explicit calendar mutations', () => {
     'Put the dentist appointment on my calendar',
     'Move tomorrow\'s meeting to 3 PM',
     'Cancel the calendar event tomorrow',
+    'Sync all of my travel events and NHL Sharks games to my gcal',
+    'Import these events into Google Calendar',
+    'Mirror team meetings to my calendar',
   ]) assert.equal(isCalendarActionLocally(text), true, text);
   for (const text of [
     'What is on my calendar tomorrow?',

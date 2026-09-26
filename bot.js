@@ -742,8 +742,11 @@ only when the user explicitly asks for a household/shared reminder.
                 calendarTools
                     ? `CALENDAR ACTION REQUEST ID:\n\n` +
                       `${requestId}\n\n` +
-                      `When creating a Google Calendar event, pass this ` +
-                      `exact request ID as the idempotencyKey. Use the live ` +
+                      `When creating one Google Calendar event, pass this ` +
+                      `exact request ID as the idempotencyKey. For multiple ` +
+                      `events, append a stable source-event identifier to this ` +
+                      `request ID so every event has a distinct, repeatable ` +
+                      `idempotencyKey. Use the live ` +
                       `calendar tools as authoritative. Search for duplicates ` +
                       `before creating; fetch the current event and ETag before ` +
                       `updating or deleting. Ask for clarification when the ` +
@@ -753,7 +756,12 @@ only when the user explicitly asks for a household/shared reminder.
                       `only when explicitly requested or when an authoritative ` +
                       `linked source identifies the exact removed event; never ` +
                       `delete from title/date similarity alone. Report success ` +
-                      `only after the tool confirms the change.\n\n`
+                      `only after the tool confirms the change. The Calendar ` +
+                      `tools are connected for this turn, so do not claim they ` +
+                      `are disconnected. If confirmation or clarification is ` +
+                      `needed before writing, ask the user to restate the ` +
+                      `confirmed Google Calendar action explicitly in the next ` +
+                      `message rather than replying only “confirmed.”\n\n`
                     : ""
             ) +
             `USER REQUEST:\n\n${prompt}`;

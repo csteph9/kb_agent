@@ -7,6 +7,7 @@ const writePatterns = [
   /^(?:please\s+)?set (?:a|an) reminder\b/,
   /^(?:please\s+)?(?:schedule|reschedule|cancel)\b/,
   /^(?:please\s+)?(?:create|add|update|move|change|delete|remove)\b.{0,80}\b(?:calendar|event|appointment|meeting)\b/,
+  /^(?:please\s+)?(?:sync|import|copy|mirror|publish)\b.{0,120}\b(?:gcal|google calendar|calendars?|events?|appointments?|meetings?)\b/,
   /^(?:please\s+)?process (?:my|the) inbox\b/,
 ];
 
@@ -17,8 +18,8 @@ const readPatterns = [
 
 const calendarActionPatterns = [
   /^(?:please\s+)?(?:schedule|reschedule|cancel)\b/,
-  /\b(?:add|create|put|schedule|reschedule|move|update|change|cancel|delete|remove)\b.{0,120}\b(?:calendar|event|appointment|meeting)\b/,
-  /\b(?:calendar|event|appointment|meeting)\b.{0,120}\b(?:add|create|schedule|reschedule|move|update|change|cancel|delete|remove)\b/,
+  /\b(?:add|create|put|schedule|reschedule|move|update|change|cancel|delete|remove|sync|import|copy|mirror|publish)\b.{0,160}\b(?:gcal|google calendar|calendars?|events?|appointments?|meetings?)\b/,
+  /\b(?:gcal|google calendar|calendars?|events?|appointments?|meetings?)\b.{0,160}\b(?:add|create|schedule|reschedule|move|update|change|cancel|delete|remove|sync|import|copy|mirror|publish)\b/,
 ];
 
 export function isCalendarActionLocally(userText) {
