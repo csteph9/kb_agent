@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyIntentLocally, isCalendarActionLocally } from '../intent-classifier.js';
+import {
+  classifyIntentLocally,
+  isCalendarActionLocally,
+  isCalendarFollowupLocally
+} from '../intent-classifier.js';
 
 test('classifies high-confidence reads locally', () => {
   for (const text of [
@@ -24,6 +28,8 @@ test('classifies explicit writes locally', () => {
     'Reschedule the team meeting to 3 PM',
     'Cancel the calendar event tomorrow',
     'Sync all of my travel events and NHL Sharks games to my gcal',
+    'Post all reservation details to the gcal events',
+    'For the reservations and flights, make sure to post all details to the gcal events',
     'Process my inbox',
   ]) assert.equal(classifyIntentLocally(text), 'WRITE', text);
 });
@@ -44,10 +50,25 @@ test('enables calendar tools only for explicit calendar mutations', () => {
     'Sync all of my travel events and NHL Sharks games to my gcal',
     'Import these events into Google Calendar',
     'Mirror team meetings to my calendar',
+    'For the reservations and flights, post all details to the gcal events',
   ]) assert.equal(isCalendarActionLocally(text), true, text);
   for (const text of [
     'What is on my calendar tomorrow?',
     'Tell me about the meeting',
     'Remember that dinner is next Friday',
   ]) assert.equal(isCalendarActionLocally(text), false, text);
+});
+
+test('recognizes calendar follow-ups only after a caller establishes context', () => {
+  for (const text of [
+    'confirmed',
+    'Go ahead.',
+    'Also make sure to include the reservation details',
+    'Put it on gcal',
+  ]) assert.equal(isCalendarFollowupLocally(text), true, text);
+
+  for (const text of [
+    'What is the weather?',
+    'Remember that dinner is next Friday',
+  ]) assert.equal(isCalendarFollowupLocally(text), false, text);
 });

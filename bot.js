@@ -7,7 +7,8 @@ import path from "path";
 import { userErrorMessage, relayCodexProgress } from "./codex-control.js";
 import {
     classifyIntentLocally,
-    isCalendarActionLocally
+    isCalendarActionLocally,
+    isCalendarFollowupLocally
 } from "./intent-classifier.js";
 import {
     parseUserAliases,
@@ -70,6 +71,9 @@ const SESSION_DIR =
 
 const SESSION_TIMEOUT_MS =
     6 * 60 * 60 * 1000;
+
+const CALENDAR_CONTEXT_TIMEOUT_MS =
+    30 * 60 * 1000;
 
 const MAX_TEXT_CHARS = 250000;
 
@@ -338,7 +342,8 @@ async function loadSession(userId) {
 
 async function saveSession(
     userId,
-    threadId
+    threadId,
+    calendarContextUntil = null
 ) {
     await ensureSessionDirectory();
 
@@ -347,6 +352,14 @@ async function saveSession(
         lastUsed:
             new Date().toISOString()
     };
+
+    if (
+        calendarContextUntil &&
+        Number.isFinite(Date.parse(calendarContextUntil))
+    ) {
+        state.calendarContextUntil =
+            calendarContextUntil;
+    }
 
     const sessionFile =
         sessionFileFor(userId);
@@ -680,6 +693,37 @@ async function runCodex(
         const sessionId =
             session?.threadId || "";
 
+        const savedCalendarContextUntil =
+            Date.parse(
+                session?.calendarContextUntil || ""
+            );
+
+        const calendarContextActive =
+            Number.isFinite(savedCalendarContextUntil) &&
+            savedCalendarContextUntil > Date.now();
+
+        calendarTools =
+            mode === "WRITE" &&
+            (
+                calendarTools ||
+                (
+                    calendarContextActive &&
+                    isCalendarFollowupLocally(prompt)
+                )
+            );
+
+        const calendarContextUntil =
+            calendarTools
+                ? new Date(
+                    Date.now() +
+                    CALENDAR_CONTEXT_TIMEOUT_MS
+                ).toISOString()
+                : (
+                    calendarContextActive
+                        ? session.calendarContextUntil
+                        : null
+                );
+
         const currentUserName =
             userNameFor(userId);
 
@@ -756,7 +800,12 @@ only when the user explicitly asks for a household/shared reminder.
                       `only when explicitly requested or when an authoritative ` +
                       `linked source identifies the exact removed event; never ` +
                       `delete from title/date similarity alone. Report success ` +
-                      `only after the tool confirms the change. The Calendar ` +
+                      `only after the tool confirms the change. For bulk ` +
+                      `actions, count only successful tool responses and never ` +
+                      `claim an aggregate total unless every reported event was ` +
+                      `confirmed. Do not modify KB files merely to record ` +
+                      `Calendar sync status; later ingestion performs that ` +
+                      `reconciliation. The Calendar ` +
                       `tools are connected for this turn, so do not claim they ` +
                       `are disconnected. If confirmation or clarification is ` +
                       `needed before writing, ask the user to restate the ` +
@@ -847,7 +896,8 @@ only when the user explicitly asks for a household/shared reminder.
         if (sessionId) {
             await saveSession(
                 userId,
-                sessionId
+                sessionId,
+                calendarContextUntil
             );
 
         } else {
@@ -864,7 +914,8 @@ only when the user explicitly asks for a household/shared reminder.
 
             await saveSession(
                 userId,
-                newThreadId
+                newThreadId,
+                calendarContextUntil
             );
         }
 
