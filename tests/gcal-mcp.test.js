@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -34,4 +35,13 @@ test('Google Calendar MCP server advertises bounded read and write tools', async
   } finally {
     await client.close();
   }
+});
+
+test('Telegram calendar turns require the MCP server and pre-approve its tools', async () => {
+  const wrapper = await fs.readFile('run-codex.sh', 'utf8');
+  assert.match(wrapper, /mcp_servers\.knowledge-gcal\.required=true/);
+  assert.match(
+    wrapper,
+    /mcp_servers\.knowledge-gcal\.default_tools_approval_mode="approve"/
+  );
 });

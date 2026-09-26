@@ -43,7 +43,12 @@ PROFILE=bulk
 [[ "$MODE" != READ ]] || PROFILE=answer
 ARGS=("--knowledge-call-profile=$PROFILE" -C "$WORK" -c 'sandbox_mode="workspace-write"' -c 'sandbox_workspace_write.writable_roots=[]' exec)
 if [[ "$CALENDAR_TOOLS" == true ]]; then
-  ARGS=(-c 'mcp_servers.knowledge-gcal.command="/opt/knowledge-agent/gcal-mcp.sh"' "${ARGS[@]}")
+  ARGS=(
+    -c 'mcp_servers.knowledge-gcal.command="/opt/knowledge-agent/gcal-mcp.sh"'
+    -c 'mcp_servers.knowledge-gcal.required=true'
+    -c 'mcp_servers.knowledge-gcal.default_tools_approval_mode="approve"'
+    "${ARGS[@]}"
+  )
 fi
 if [[ -n "$SESSION_ID" ]]; then ARGS+=(resume "$SESSION_ID"); fi
 ARGS+=(--json -o "$TEMP/response.txt")

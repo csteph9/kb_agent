@@ -127,6 +127,9 @@ subscribed-calendar list. The Telegram wrapper injects the local
 `knowledge-gcal` MCP server only for requests explicitly classified as calendar
 mutations. It is not registered globally, so ingestion, scheduled reports,
 classifiers, and ordinary conversations cannot discover its write tools.
+Those explicitly gated Telegram turns pre-approve the local Calendar tools
+because they run non-interactively; provider access, writable-calendar,
+deletion, idempotency and ETag checks remain enforced by the tool server.
 
 Agent writes are live Google API operations, separate from the ingestion queue.
 Creates use deterministic provider event IDs; updates/deletes require a current
