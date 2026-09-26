@@ -237,6 +237,9 @@ The application distribution contains:
 |-- README.md
 |-- bot.js
 |-- notification-routing.js
+|-- gcal-auth.js
+|-- gcal-mcp.js
+|-- gcal-mcp.sh
 |-- config/
 |   \-- sources/
 |       |-- personal-gmail.example.json
@@ -379,6 +382,7 @@ sudo cp README.md /opt/knowledge-agent/
 sudo cp run-ingest-write.sh deploy-ingest.sh /opt/knowledge-agent/
 sudo cp run-codex-call.sh codex-control.js deploy-codex.sh /opt/knowledge-agent/
 sudo cp bot.js intent-classifier.js notification-routing.js /opt/knowledge-agent/
+sudo cp gcal-auth.js gcal-mcp.js gcal-mcp.sh /opt/knowledge-agent/
 sudo cp gmail-auth.js /opt/knowledge-agent/
 sudo cp gmail-ingest.js /opt/knowledge-agent/
 sudo cp http-puller.js /opt/knowledge-agent/
@@ -396,6 +400,7 @@ Set permissions:
 
 ``` bash
 sudo chmod 755 \
+  /opt/knowledge-agent/gcal-mcp.sh \
   /opt/knowledge-agent/gmail-auth.js \
   /opt/knowledge-agent/gmail-ingest.js \
   /opt/knowledge-agent/http-puller.js \
@@ -428,6 +433,8 @@ Syntax-check the JavaScript:
 
 ``` bash
 sudo -u knowledge -H node --check /opt/knowledge-agent/bot.js
+sudo -u knowledge -H node --check /opt/knowledge-agent/gcal-auth.js
+sudo -u knowledge -H node --check /opt/knowledge-agent/gcal-mcp.js
 sudo -u knowledge -H node --check /opt/knowledge-agent/gmail-auth.js
 sudo -u knowledge -H node --check /opt/knowledge-agent/gmail-ingest.js
 sudo -u knowledge -H node --check /opt/knowledge-agent/http-puller.js

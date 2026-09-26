@@ -5,7 +5,10 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 import { userErrorMessage, relayCodexProgress } from "./codex-control.js";
-import { classifyIntentLocally } from "./intent-classifier.js";
+import {
+    classifyIntentLocally,
+    isCalendarActionLocally
+} from "./intent-classifier.js";
 import {
     parseUserAliases,
     resolveRecipientPrefix,
@@ -494,7 +497,8 @@ Classify the user's request as exactly READ or WRITE.
 
 WRITE means fulfilling the request requires changing, adding, deleting,
 organizing, processing into, correcting, or otherwise modifying the
-persistent Markdown knowledge base.
+persistent Markdown knowledge base or a configured external service such
+as Google Calendar.
 
 READ means the request can be fulfilled by answering conversationally
 without changing the persistent knowledge base.
@@ -511,6 +515,7 @@ Important rules:
   "change...", "delete...", "remove...", "process my inbox", and
   equivalent instructions are WRITE.
 - A correction intended to update stored knowledge is WRITE.
+- Creating, updating, rescheduling, or deleting a calendar event is WRITE.
 - Do not classify something WRITE merely because it contains new facts.
 - An attachment is NOT automatically WRITE. Determine intent from the
   user's instruction.
@@ -644,7 +649,9 @@ async function runCodex(
     userId,
     prompt,
     imageFile = null,
-    mode = "READ"
+    mode = "READ",
+    calendarTools = false,
+    requestId = null
 ) {
     const tempDir =
         await fs.mkdtemp(
@@ -685,6 +692,8 @@ This request has been classified as WRITE.
 
 You may modify the Markdown knowledge base as necessary to fulfill the
 user's request. Search existing knowledge before creating duplicates.
+You may also use configured write-capable tools such as Google Calendar
+when the user explicitly requests the corresponding external action.
 `
                 : `
 SYSTEM FOR THIS TURN:
@@ -697,6 +706,9 @@ current conversation context.
 DO NOT create, edit, delete, rename, or otherwise modify any files in
 the knowledge base during this turn. This is a conversational/read-only
 request.
+
+DO NOT create, update, reschedule, or delete external calendar events
+during this turn. Read-only calendar lookups are allowed when relevant.
 `;
 
         const identityInstruction = `
@@ -726,6 +738,24 @@ only when the user explicitly asks for a household/shared reminder.
         const finalPrompt =
             `${modeInstruction}\n` +
             `${identityInstruction}\n\n` +
+            (
+                calendarTools
+                    ? `CALENDAR ACTION REQUEST ID:\n\n` +
+                      `${requestId}\n\n` +
+                      `When creating a Google Calendar event, pass this ` +
+                      `exact request ID as the idempotencyKey. Use the live ` +
+                      `calendar tools as authoritative. Search for duplicates ` +
+                      `before creating; fetch the current event and ETag before ` +
+                      `updating or deleting. Ask for clarification when the ` +
+                      `calendar, event, date, time, time zone, or recurring ` +
+                      `scope is ambiguous. Do not add attendees or modify a ` +
+                      `recurring series unless explicitly requested. Delete ` +
+                      `only when explicitly requested or when an authoritative ` +
+                      `linked source identifies the exact removed event; never ` +
+                      `delete from title/date similarity alone. Report success ` +
+                      `only after the tool confirms the change.\n\n`
+                    : ""
+            ) +
             `USER REQUEST:\n\n${prompt}`;
 
         const args = [
@@ -733,7 +763,8 @@ only when the user explicitly asks for a household/shared reminder.
             sessionId,
             imageFile || "",
             jsonFile,
-            mode
+            mode,
+            calendarTools ? "true" : "false"
         ];
 
         await new Promise(
@@ -2077,7 +2108,10 @@ Do not store the source image itself in the knowledge repository.
                                 userId,
                                 prompt,
                                 imageFile,
-                                mode
+                                mode,
+                                mode === "WRITE" &&
+                                    isCalendarActionLocally(caption),
+                                `telegram-${ctx.update.update_id}`
                             );
 
                         } finally {
@@ -2294,7 +2328,10 @@ ${documentText}
                                 userId,
                                 prompt,
                                 null,
-                                mode
+                                mode,
+                                mode === "WRITE" &&
+                                    isCalendarActionLocally(caption),
+                                `telegram-${ctx.update.update_id}`
                             );
 
                         } finally {
@@ -2394,7 +2431,10 @@ bot.on(
                             userId,
                             prompt,
                             null,
-                            mode
+                            mode,
+                            mode === "WRITE" &&
+                                isCalendarActionLocally(prompt),
+                            `telegram-${ctx.update.update_id}`
                         );
                     }
                 );

@@ -5,6 +5,8 @@ const writePatterns = [
   /^(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:record|save|store|add|update|change|correct|delete|remove|forget|edit|modify|organize|move|rename)\b/,
   /^(?:please\s+)?remind\b/,
   /^(?:please\s+)?set (?:a|an) reminder\b/,
+  /^(?:please\s+)?(?:schedule|reschedule|cancel)\b/,
+  /^(?:please\s+)?(?:create|add|update|move|change|delete|remove)\b.{0,80}\b(?:calendar|event|appointment|meeting)\b/,
   /^(?:please\s+)?process (?:my|the) inbox\b/,
 ];
 
@@ -12,6 +14,17 @@ const readPatterns = [
   /^(?:what|who|when|where|why|how|which|whose|is|are|am|was|were|do|does|did|can|could|would|should|will|have|has|had)\b/,
   /^(?:please\s+)?(?:answer|summarize|explain|tell|show|list|find|search|look up|compare|describe|review|check)\b/,
 ];
+
+const calendarActionPatterns = [
+  /^(?:please\s+)?(?:schedule|reschedule|cancel)\b/,
+  /\b(?:add|create|put|schedule|reschedule|move|update|change|cancel|delete|remove)\b.{0,120}\b(?:calendar|event|appointment|meeting)\b/,
+  /\b(?:calendar|event|appointment|meeting)\b.{0,120}\b(?:add|create|schedule|reschedule|move|update|change|cancel|delete|remove)\b/,
+];
+
+export function isCalendarActionLocally(userText) {
+  const text = String(userText || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return calendarActionPatterns.some(pattern => pattern.test(text));
+}
 
 // Return null when wording is ambiguous so the model classifier remains the
 // conservative fallback. Attachments without instructions retain WRITE-by-default.

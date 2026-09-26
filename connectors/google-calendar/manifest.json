@@ -1,0 +1,66 @@
+{
+  "id": "google-calendar",
+  "apiVersion": 1,
+  "description": "Google Calendar events with optional agent-managed writes",
+  "capabilities": [
+    "poll",
+    "manual",
+    "write-tools"
+  ],
+  "configSchema": {
+    "type": "object",
+    "required": [
+      "calendarIds"
+    ],
+    "properties": {
+      "stateDir": {
+        "type": "string"
+      },
+      "calendarIds": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "lookbackDays": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 3650
+      },
+      "lookaheadDays": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 3650
+      },
+      "includeAttendees": {
+        "type": "boolean"
+      },
+      "writeEnabled": {
+        "type": "boolean"
+      },
+      "writableCalendarIds": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allowDelete": {
+        "type": "boolean"
+      },
+      "sendUpdates": {
+        "type": "string",
+        "enum": [
+          "none",
+          "all",
+          "externalOnly"
+        ]
+      }
+    },
+    "additionalProperties": false
+  }
+}

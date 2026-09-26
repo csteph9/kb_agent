@@ -1,0 +1,33 @@
+{
+  "id": "personal-google-calendar",
+  "connector": "google-calendar",
+  "enabled": false,
+  "owner": "PKB",
+  "credentialsRef": "personal-google-calendar",
+  "config": {
+    "calendarIds": [
+      "primary"
+    ],
+    "lookbackDays": 30,
+    "lookaheadDays": 365,
+    "includeAttendees": true,
+    "writeEnabled": true,
+    "writableCalendarIds": [
+      "primary"
+    ],
+    "allowDelete": true,
+    "sendUpdates": "none"
+  },
+  "schedule": {
+    "everySeconds": 600
+  },
+  "ingestion": {
+    "profile": "calendar",
+    "maxItemsPerRun": 50,
+    "maxPagesPerRun": 20,
+    "maxItemChars": 200000,
+    "captureContacts": false,
+    "captureFollowups": false,
+    "captureReminders": true
+  }
+}

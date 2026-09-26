@@ -10,7 +10,9 @@ SESSION_ID="${2:-}"
 IMAGE="${3:-}"
 JSON_OUTPUT="${4:?JSON output file required}"
 MODE="${5:-READ}"
+CALENDAR_TOOLS="${6:-false}"
 [[ "$MODE" == READ || "$MODE" == WRITE ]] || { echo 'Invalid request mode' >&2; exit 64; }
+[[ "$CALENDAR_TOOLS" == true || "$CALENDAR_TOOLS" == false ]] || { echo 'Invalid calendar tool mode' >&2; exit 64; }
 [[ "$OUTPUT" == /* && "$JSON_OUTPUT" == /* ]] || { echo 'Output paths must be absolute' >&2; exit 64; }
 cd "$REPO"
 exec 9>"$LOCK"
@@ -40,6 +42,9 @@ git worktree add --detach "$WORK" "$BASE" >/dev/null 2>&1
 PROFILE=bulk
 [[ "$MODE" != READ ]] || PROFILE=answer
 ARGS=("--knowledge-call-profile=$PROFILE" -C "$WORK" -c 'sandbox_mode="workspace-write"' -c 'sandbox_workspace_write.writable_roots=[]' exec)
+if [[ "$CALENDAR_TOOLS" == true ]]; then
+  ARGS=(-c 'mcp_servers.knowledge-gcal.command="/opt/knowledge-agent/gcal-mcp.sh"' "${ARGS[@]}")
+fi
 if [[ -n "$SESSION_ID" ]]; then ARGS+=(resume "$SESSION_ID"); fi
 ARGS+=(--json -o "$TEMP/response.txt")
 if [[ -n "$IMAGE" ]]; then ARGS+=(--image "$IMAGE"); fi

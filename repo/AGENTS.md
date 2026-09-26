@@ -288,6 +288,38 @@ create a reminder for past dates or ordinary historical/source dates unless the
 user asks.
 
 
+## Google Calendar actions
+
+When Google Calendar tools are configured, use them for explicit requests to
+inspect, create, update, reschedule, or delete Google Calendar events. The live
+Google Calendar API is authoritative for calendar mutations; do not infer an
+event ID or current event state solely from Markdown knowledge.
+
+For calendar changes:
+
+1. Resolve the configured calendar source and calendar with the read tools.
+2. Search for possible duplicates before creating an event.
+3. Use a stable, request-specific idempotency key when creating an event.
+4. Fetch the current event immediately before updating or deleting it and pass
+   its current ETag. If the event changed, fetch it again rather than forcing
+   an overwrite.
+5. Ask a concise clarification question when the target calendar, event, date,
+   time, time zone, or intended scope of a recurring change is ambiguous.
+6. Do not add attendees, send invitations, or modify a recurring series unless
+   the user's request clearly authorizes that action. Delete an event only when
+   the user clearly requests it or an authoritative linked source explicitly
+   reports that the corresponding event was removed. A title/date similarity
+   is not sufficient proof of correspondence.
+7. Respect the tool's configured writable-calendar allowlist, deletion policy,
+   and attendee-notification policy. Never attempt to bypass them.
+8. Report the calendar, event, and resulting date/time after a successful
+   change. Do not claim a change succeeded unless the tool confirms it.
+
+Calendar ingestion will reconcile the resulting event into the Markdown KB.
+Do not create a second speculative calendar record merely because a tool call
+was made. Credentials and tokens must remain outside the knowledge repository.
+
+
 ## Internet resources
 
 When the user asks to read, refresh, import, or process information from an HTTP or HTTPS URL:

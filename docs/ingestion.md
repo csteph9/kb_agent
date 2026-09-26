@@ -90,6 +90,49 @@ sudo -u knowledge -H node /opt/knowledge-agent/gmail-auth.js personal-gmail
 
 Without a source ID, gmail-auth.js uses GMAIL_STATE_DIR.
 
+Google Calendar uses the `google-calendar` connector. Copy
+`personal-google-calendar.example.json` to an active `.json` source. Keep it
+disabled during authorization and connection checks, then set `enabled` to
+true before the first ingestion run. Configure:
+
+- `calendarIds`: calendars that are ingested into the KB. Use `primary` for the
+  authenticated account's primary calendar.
+- `lookbackDays` and `lookaheadDays`: the bounded ingestion window.
+- `writeEnabled`: whether the agent action tool may write at all.
+- `writableCalendarIds`: the subset of ingested calendars the agent may change.
+- `allowDelete`: whether the agent may delete events. The personal Calendar
+  example enables this so confirmed removals can be propagated to Google
+  Calendar.
+- `sendUpdates`: `none` by default, or `all`/`externalOnly` when Google should
+  email attendee updates.
+
+Enable the Google Calendar API in the same Google Cloud project. A desktop OAuth
+client can be reused for Gmail, but Calendar authorization uses a separate token
+because it requests Calendar scopes. Copy its `credentials.json` into
+`var/ingest/credentials/<credentialsRef-or-source-id>/`, then authorize:
+
+```bash
+sudo -u knowledge -H node /opt/knowledge-agent/gcal-auth.js personal-google-calendar
+sudo -u knowledge -H node /opt/knowledge-agent/ingest/cli.js check personal-google-calendar
+# Set enabled=true in the source after the check succeeds.
+sudo -u knowledge -H node /opt/knowledge-agent/ingest/cli.js run personal-google-calendar
+```
+
+The authorization command prints the subscribed calendar names, IDs, access
+roles, and time zones. Use those exact IDs when finalizing `calendarIds` and
+`writableCalendarIds`.
+
+The authorization requests event read/write access and read-only access to the
+subscribed-calendar list. The Telegram wrapper injects the local
+`knowledge-gcal` MCP server only for requests explicitly classified as calendar
+mutations. It is not registered globally, so ingestion, scheduled reports,
+classifiers, and ordinary conversations cannot discover its write tools.
+
+Agent writes are live Google API operations, separate from the ingestion queue.
+Creates use deterministic provider event IDs; updates/deletes require a current
+ETag; local configuration independently limits writable calendars and deletion.
+The next ingestion run reconciles successful Google changes into Markdown.
+
 RSS accepts an RSS or Atom `url`. Calendar accepts an ICS `url`. Website accepts
 a single public HTML/text/XML/JSON `url` and optional `title`. Website is a
 single-resource connector, not a crawler or a browser automation service.
