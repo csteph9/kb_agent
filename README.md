@@ -719,13 +719,16 @@ messages to another configured user:
 /remind my wife 2026-09-25 to renew her passport
 /remind household tomorrow to take out the bins
 /send Alice Dinner moved to 6:30
+Send Alice a message that dinner moved to 6:30
 ```
 
 Every new reminder records `Recipients` and `Created by`. Scheduled delivery
 includes reminders addressed to the current recipient or `Household`; legacy
-entries without recipient metadata remain household reminders. `/send` only
-accepts configured names or aliases and identifies the sender in the delivered
-message. The recipient must have started the Telegram bot previously.
+entries without recipient metadata remain household reminders. `/send` and
+explicit natural-language requests such as “send Alice a message that ...” only
+accept configured names or aliases and identify the sender in the delivered
+message. Merely addressing a statement to someone does not send it. The
+recipient must have started the Telegram bot previously.
 
 `REMINDER_TIME` enables the daily reminder check. Use `HH:MM` in the
 server's local 24-hour time, for example `08:00`. Set it to `off` to

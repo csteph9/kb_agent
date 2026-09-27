@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  parseTargetedMessageRequest,
   parseUserAliases,
   resolveRecipientPrefix,
   validateRecipientDirectory
@@ -20,6 +21,39 @@ test('parses aliases only for allowed users', () => {
     () => parseUserAliases('household:101', allowed),
     /is reserved/
   );
+});
+
+test('parses explicit natural-language targeted messages', () => {
+  const cases = [
+    ['Send Alice a message that dinner moved to 6:30', 'dinner moved to 6:30'],
+    ['Please message my wife: bring a coat', 'bring a coat'],
+    ['Can you send a Telegram message to Alice saying call me?', 'call me?'],
+    ['push a message to wife that practice was canceled', 'practice was canceled'],
+  ];
+
+  for (const [input, body] of cases) {
+    assert.deepEqual(
+      parseTargetedMessageRequest(input, 202, users, aliases),
+      { userId: 101, name: 'Alice', household: false, body },
+      input
+    );
+  }
+});
+
+test('does not treat addressed statements or incomplete sends as delivery', () => {
+  for (const input of [
+    'Alice, dinner moved to 6:30',
+    'Remind Alice that dinner moved to 6:30',
+    'Tell me about Alice',
+    'Send Alice a message',
+    'Send Charlie a message that dinner moved',
+  ]) {
+    assert.equal(
+      parseTargetedMessageRequest(input, 202, users, aliases),
+      null,
+      input
+    );
+  }
 });
 
 test('rejects ambiguous names and aliases', () => {

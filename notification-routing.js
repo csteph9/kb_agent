@@ -161,3 +161,59 @@ export function resolveRecipientPrefix(
         body: remainder
     };
 }
+
+export function parseTargetedMessageRequest(
+    value,
+    senderUserId,
+    users,
+    aliases = new Map()
+) {
+    let input = String(value || "").trim();
+    if (!input) return null;
+
+    input = input.replace(
+        /^(?:(?:can|could|would|will)\s+you\s+)?(?:please\s+)?/i,
+        ""
+    );
+
+    let recipientInput = null;
+    let recipientFirst = false;
+    const messageTo = input.match(
+        /^(?:send|push)\s+(?:a\s+)?(?:telegram\s+)?message\s+to\s+(.+)$/i
+    );
+
+    if (messageTo) {
+        recipientInput = messageTo[1];
+    } else {
+        const direct = input.match(
+            /^(?:send|message)\s+(.+)$/i
+        );
+        if (!direct) return null;
+        recipientInput = direct[1];
+        recipientFirst = true;
+    }
+
+    const target = resolveRecipientPrefix(
+        recipientInput,
+        senderUserId,
+        users,
+        aliases
+    );
+    if (!target) return null;
+
+    const body = target.body
+        .replace(
+            recipientFirst
+                ? /^(?:(?:a|this)\s+)?(?:telegram\s+)?message\b(?:\s+(?:saying|that))?\s*[:,-]?\s*/i
+                : /^(?:saying|that)\b\s*[:,-]?\s*/i,
+            ""
+        )
+        .trim();
+
+    if (!body) return null;
+
+    return {
+        ...target,
+        body
+    };
+}

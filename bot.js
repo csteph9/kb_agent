@@ -11,6 +11,7 @@ import {
     isCalendarFollowupLocally
 } from "./intent-classifier.js";
 import {
+    parseTargetedMessageRequest,
     parseUserAliases,
     resolveRecipientPrefix,
     validateRecipientDirectory
@@ -2440,6 +2441,48 @@ bot.on(
 
         const userId =
             ctx.from.id;
+
+        const targetedMessage =
+            parseTargetedMessageRequest(
+                prompt,
+                userId,
+                configuredUsers(),
+                TELEGRAM_USER_ALIASES
+            );
+
+        if (targetedMessage) {
+            const senderName =
+                userNameFor(userId);
+            const outbound =
+                `Message from ${senderName} via the knowledge agent:\n\n` +
+                targetedMessage.body;
+
+            try {
+                await sendTelegramMessage(
+                    targetedMessage.userId,
+                    outbound
+                );
+                console.log(
+                    `${new Date().toISOString()} targeted message ` +
+                    `from Telegram user ${userId} ` +
+                    `to Telegram user ${targetedMessage.userId}`
+                );
+                await ctx.reply(
+                    `Sent to ${targetedMessage.name}.`
+                );
+            } catch (err) {
+                console.error(
+                    "Targeted message delivery failed:",
+                    err
+                );
+                await ctx.reply(
+                    `I couldn't deliver that message to ` +
+                    `${targetedMessage.name}. They may need to open ` +
+                    `the bot and send /start first.`
+                );
+            }
+            return;
+        }
 
         console.log(
             `${new Date().toISOString()} text request from ${userId}`
