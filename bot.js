@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 import { userErrorMessage, relayCodexProgress } from "./codex-control.js";
+import { parseRelativeReminder, saveTimedReminder, deliverDueReminders } from "./timed-reminders.js";
 import {
     classifyIntentLocally,
     isCalendarActionLocally,
@@ -66,6 +67,7 @@ const TELEGRAM_USER_ALIASES = parseUserAliases(
 );
 
 const REPO = "/home/knowledge/repo";
+const TIMED_REMINDER_DIR = "/opt/knowledge-agent/var/timed-reminders";
 
 const SESSION_DIR =
     "/opt/knowledge-agent/sessions";
@@ -1650,6 +1652,41 @@ function startReminderScheduler() {
     );
 }
 
+async function scheduleRelativeReminder(ctx, text) {
+    const reminder = parseRelativeReminder(text);
+    if (!reminder) return false;
+    await saveTimedReminder(
+        TIMED_REMINDER_DIR,
+        `telegram-${ctx.update.update_id}`,
+        ctx.from.id,
+        reminder
+    );
+    await ctx.reply(`I'll send you a Telegram reminder in ${reminder.minutes} minute${reminder.minutes === 1 ? '' : 's'}: ${reminder.message}`);
+    return true;
+}
+
+function startTimedReminderScheduler() {
+    let running = false;
+    const tick = async () => {
+        if (running) return;
+        running = true;
+        try {
+            await deliverDueReminders(
+                TIMED_REMINDER_DIR,
+                (userId, message) => bot.api.sendMessage(userId, message),
+                Date.now(),
+                (error, name) => console.error(`Timed reminder ${name} delivery failed:`, error)
+            );
+        } catch (error) {
+            console.error('Timed reminder check failed:', error);
+        } finally {
+            running = false;
+        }
+    };
+    void tick();
+    setInterval(tick, 5000);
+}
+
 
 // ---------------------------------------------------------------------------
 // Telegram file download
@@ -1861,6 +1898,13 @@ bot.command(
     "remind",
     async ctx => {
         const senderUserId = ctx.from.id;
+        try {
+            if (await scheduleRelativeReminder(ctx, `remind ${ctx.match}`)) return;
+        } catch (error) {
+            console.error('Timed reminder scheduling failed:', error);
+            await ctx.reply('I could not schedule that timed reminder. Please try again.');
+            return;
+        }
         const target = resolveCommandRecipient(
             ctx.match,
             senderUserId,
@@ -2442,6 +2486,14 @@ bot.on(
         const userId =
             ctx.from.id;
 
+        try {
+            if (await scheduleRelativeReminder(ctx, prompt)) return;
+        } catch (error) {
+            console.error('Timed reminder scheduling failed:', error);
+            await ctx.reply('I could not schedule that timed reminder. Please try again.');
+            return;
+        }
+
         const targetedMessage =
             parseTargetedMessageRequest(
                 prompt,
@@ -2617,5 +2669,6 @@ console.log(
 );
 
 startReminderScheduler();
+startTimedReminderScheduler();
 
 bot.start();

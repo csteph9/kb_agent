@@ -718,6 +718,7 @@ messages to another configured user:
 /remind me Friday to call Mom
 /remind my wife 2026-09-25 to renew her passport
 /remind household tomorrow to take out the bins
+remind me in 10 minutes to check the water
 /send Alice Dinner moved to 6:30
 Send Alice a message that dinner moved to 6:30
 ```
@@ -729,6 +730,13 @@ explicit natural-language requests such as “send Alice a message that ...” o
 accept configured names or aliases and identify the sender in the delivered
 message. Merely addressing a statement to someone does not send it. The
 recipient must have started the Telegram bot previously.
+
+Relative reminders for yourself, such as `remind me in 10 minutes to check the
+water` or `/remind me in 1 hour to call home`, are queued directly for Telegram
+delivery at the requested time. Pending jobs are stored in
+`/opt/knowledge-agent/var/timed-reminders/` and survive a bot restart. A failed
+Telegram send is retried on the next check. Other reminders continue to use the
+daily check described below.
 
 `REMINDER_TIME` enables the daily reminder check. Use `HH:MM` in the
 server's local 24-hour time, for example `08:00`. Set it to `off` to

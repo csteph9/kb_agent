@@ -62,6 +62,11 @@ h1 { margin:0 0 8px; font-size:clamp(28px,4vw,44px); }
 .pill { display:inline-block; border:1px solid currentColor; border-radius:999px; padding:6px 10px; font-weight:700; font-size:13px; }
 .ok { color:#45d483; } .warn { color:#f0c35b; } .bad { color:#ff5f6d; } .unknown { color:#8ea0ff; }
 .detail { font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
+.commands { margin:16px 0 0; padding:12px 0 0 20px; border-top:1px solid var(--border); font-size:12px; line-height:1.8; }
+.commands li { padding:2px 0; }
+.commands code { font:12px/1.5 ui-monospace,monospace; overflow-wrap:anywhere; }
+.copy { margin-left:8px; padding:0; border:0; background:none; color:#8ea0ff; font:inherit; text-decoration:underline; cursor:pointer; }
+.copy:hover, .copy:focus-visible { color:#c4cdff; }
 footer { font-size:12px; margin-top:18px; }
 \@media(max-width:800px) { body { padding:18px; } .row { grid-template-columns:1fr; } }
 </style></head><body><main>
@@ -113,6 +118,13 @@ for my $entry (@units) {
     push @details, 'Status query unavailable.' unless $p->{query_ok} || ($p->{LoadState} || '') eq 'not-found';
     my $details = join '<br>', map { esc($_) } @details;
     my $raw = join ' / ', map { $p->{$_} || 'unknown' } qw(ActiveState SubState);
+    my @commands = (
+        ['Stop', "sudo systemctl stop $unit"],
+        ['Start', "sudo systemctl start $unit"],
+        ['Restart', "sudo systemctl restart $unit"],
+        ['Check health', "sudo systemctl status $unit --no-pager -l"],
+        ['View logs', "sudo journalctl -u $unit -n 100 --no-pager"],
+    );
     print '<article class="card"><div class="row"><div><div class="unit">', esc($unit),
         '</div><div class="desc">', esc($p->{Description} || $unit),
         '</div></div><div><div class="label">Health</div><span class="pill ', $class, '">', esc($label),
@@ -120,11 +132,42 @@ for my $entry (@units) {
         '</div></div><div><div class="label">Startup</div><span class="pill ', $boot_class, '">', esc($boot),
         '</span><div class="raw">', esc($enabled),
         '</div></div><div><div class="label">Details</div><div class="detail">', $details,
-        '</div></div></div></article>', "\n";
+        '</div></div></div><ul class="commands">';
+    for my $command (@commands) {
+        print '<li>', esc($command->[0]), ': <code>', esc($command->[1]),
+            '</code><button type="button" class="copy" data-command="',
+            esc($command->[1]), '">Copy</button></li>';
+    }
+    print '</ul></article>', "\n";
 }
 print '</section><footer>Read-only monitoring. No services are started or stopped. ',
     scalar(@units), ' units checked. Queue counts and failures: sudo -u knowledge node /opt/knowledge-agent/ingest/cli.js status',
-    '</footer></main></body></html>', "\n";
+    '</footer></main><script>', <<'JS', '</script></body></html>', "\n";
+document.addEventListener('click', async event => {
+  const button = event.target.closest('button.copy');
+  if (!button) return;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(button.dataset.command);
+    } else {
+      const input = document.createElement('textarea');
+      input.value = button.dataset.command;
+      input.style.position = 'fixed';
+      input.style.opacity = '0';
+      document.body.append(input);
+      input.select();
+      const copied = document.execCommand('copy');
+      input.remove();
+      if (!copied) throw new Error('Clipboard unavailable');
+    }
+    button.textContent = 'Copied';
+    setTimeout(() => { button.textContent = 'Copy'; }, 1500);
+  } catch {
+    button.textContent = 'Copy failed';
+    setTimeout(() => { button.textContent = 'Copy'; }, 1500);
+  }
+});
+JS
 
 sub systemctl {
     # Bound each command, disable paging, and avoid shell interpolation.

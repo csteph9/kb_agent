@@ -36,9 +36,9 @@ Calls outside these application wrappers are not covered by this gate.
 Application calls set `features.multi_agent=false` so research runs cannot use
 Codex's subagent tools to fan out requests. This does not rate-limit individual
 HTTP requests or hosted tools inside a Codex turn and cannot prevent a general
-provider capacity outage. READ answers, WRITE operations, and ingestion are
-pinned to `gpt-6-sol` with medium reasoning. Ambiguous intent classification remains
-pinned to `gpt-5.6-luna` with low reasoning. High-confidence requests are
+provider capacity outage. READ answers and ambiguous intent classification are
+pinned to `gpt-5.6-luna` with low reasoning. WRITE operations and ingestion are
+pinned to `gpt-5.6-sol` with medium reasoning. High-confidence requests are
 classified locally; Luna is used only when the wording is ambiguous. Conflicting
 model arguments are rejected rather than overriding the application-selected pin.
 
