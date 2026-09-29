@@ -100,9 +100,9 @@ test('user messages distinguish transient failures and already committed updates
   assert.match(userErrorMessage({ exitCode: 2 }), /saved locally/);
   assert.match(userErrorMessage({ exitCode: 73 }), /existing files were preserved/);
 });
-test('bulk invocations are pinned to GPT-6 Sol with medium reasoning', () => {
+test('bulk invocations are pinned to GPT-5.6 Sol with medium reasoning', () => {
   assert.deepEqual(pinnedCodexArgs(['-C', '/tmp/work', 'exec', '--json', '-']), [
-    '-C', '/tmp/work', '--model', 'gpt-6-sol',
+    '-C', '/tmp/work', '--model', 'gpt-5.6-sol',
     '-c', 'model_reasoning_effort="medium"',
     '-c', 'features.multi_agent=false', 'exec', '--json', '-'
   ]);
@@ -124,11 +124,11 @@ test('classifier invocations are explicitly pinned to GPT-5.6 Luna', () => {
     '--knowledge-call-profile=classifier', '--knowledge-call-profile=bulk', 'exec'
   ]), /Duplicate/);
 });
-test('READ answer invocations use GPT-6 Sol with medium reasoning', () => {
+test('READ answer invocations use GPT-5.6 Luna with low reasoning', () => {
   const selected = callProfile(['--knowledge-call-profile=answer', 'exec', '--json', '-']);
   assert.deepEqual(pinnedCodexArgs(selected.args, selected.profile), [
-    '--model', 'gpt-6-sol',
-    '-c', 'model_reasoning_effort="medium"',
+    '--model', 'gpt-5.6-luna',
+    '-c', 'model_reasoning_effort="low"',
     '-c', 'features.multi_agent=false', 'exec', '--json', '-'
   ]);
 });

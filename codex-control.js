@@ -93,8 +93,9 @@ export function pinnedCodexArgs(args, profile = 'bulk') {
       throw new Error('Codex model override rejected');
     }
   }
-  const model = profile === 'classifier' ? 'gpt-5.6-luna' : 'gpt-6-sol';
-  const reasoning = profile === 'classifier' ? 'low' : 'medium';
+  const lightweight = profile === 'classifier' || profile === 'answer';
+  const model = lightweight ? 'gpt-5.6-luna' : 'gpt-5.6-sol';
+  const reasoning = lightweight ? 'low' : 'medium';
   return [
     ...args.slice(0, execIndex),
     '--model', model,
