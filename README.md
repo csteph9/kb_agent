@@ -381,7 +381,7 @@ sudo cp -r ingest connectors config docs tests /opt/knowledge-agent/
 sudo cp README.md /opt/knowledge-agent/
 sudo cp run-ingest-write.sh deploy-ingest.sh /opt/knowledge-agent/
 sudo cp run-codex-call.sh codex-control.js deploy-codex.sh /opt/knowledge-agent/
-sudo cp bot.js intent-classifier.js notification-routing.js /opt/knowledge-agent/
+sudo cp bot.js morning-updates.js intent-classifier.js notification-routing.js /opt/knowledge-agent/
 sudo cp gcal-auth.js gcal-mcp.js gcal-mcp.sh /opt/knowledge-agent/
 sudo cp gmail-auth.js /opt/knowledge-agent/
 sudo cp gmail-ingest.js /opt/knowledge-agent/
@@ -770,6 +770,15 @@ into `.env` or `config/sources`. The subsequent READ-only report includes
 relevant changes and identifies refresh failures so stale schedule information
 is not silently presented as current. Set the value to `off` to skip this
 pre-report refresh.
+
+After each morning message delivery attempt, a separate WRITE transaction
+archives the exact generated message (including weather and news) in
+`daily/YYYY-MM-DD.md`, preserving existing notes. Each entry records its
+recipient, Telegram user ID, timestamp, and delivery status. Failed or partial
+delivery is labeled explicitly. Logging failures are reported separately in
+the service logs; a remote synchronization failure leaves the saved local
+entry available for the normal sync process. This runs independently of chat
+instructions stored in the KB and also runs when schedule refresh is disabled.
 
 If reminders are due, the message also includes a reminder list.
 Date-specific reminders are included 7 days before, 2 days before, and

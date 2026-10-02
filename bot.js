@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 import { userErrorMessage, relayCodexProgress } from "./codex-control.js";
+import { deliverAndLogMorningUpdate, logMorningUpdate } from "./morning-updates.js";
 import { parseRelativeReminder, saveTimedReminder, deliverDueReminders } from "./timed-reminders.js";
 import {
     classifyIntentLocally,
@@ -1537,15 +1538,26 @@ async function sendDailyReminders() {
                 continue;
             }
 
-            await sendTelegramMessage(
+            const timestamp = new Date();
+            const result = await deliverAndLogMorningUpdate({
+                date: localDateKey(timestamp),
+                timestamp: timestamp.toISOString(),
                 userId,
-                message.trim()
-            );
+                recipient: userNameFor(userId),
+                message: message.trim()
+            }, sendTelegramMessage, record => logMorningUpdate(record, REPO));
 
-            console.log(
-                `${new Date().toISOString()} ` +
-                `sent reminder to Telegram user ${userId}`
-            );
+            if (result.deliveryError) {
+                console.error(`Morning update delivery failed for ${userId}:`, result.deliveryError);
+            } else {
+                console.log(`${new Date().toISOString()} sent reminder to Telegram user ${userId}`);
+            }
+            if (result.loggingError) {
+                console.error(`Morning update KB logging failed for ${userId}:`, result.loggingError);
+            } else {
+                console.log(`${new Date().toISOString()} morning update logged for ${userId}` +
+                    (result.loggingResult.synchronizationPending ? '; remote synchronization pending' : ''));
+            }
 
         } catch (err) {
             console.error(
