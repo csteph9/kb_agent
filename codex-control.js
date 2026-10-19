@@ -15,6 +15,19 @@ export function failureKind(message) {
   return 'unknown';
 }
 
+// Fixed diagnostic codes only: CLI errors can include prompts, URLs or secrets.
+export function failureReason(message = '') {
+  if (/invalid.{0,40}schema|schema.{0,40}(invalid|unsupported)|response_format|output.schema/i.test(message)) return 'output-schema';
+  if (/trusted directory|skip-git-repo-check|not.{0,20}git repository/i.test(message)) return 'workspace-trust';
+  if (/model.{0,50}(not found|does not exist|not supported|unsupported|access)|unsupported.{0,20}model/i.test(message)) return 'model-access';
+  if (/authentication|unauthori[sz]ed|invalid.api.key|\b401\b/i.test(message)) return 'authentication';
+  if (/insufficient[_ ]quota|usage[_ ]limit|billing|\b403\b/i.test(message)) return 'quota-or-permissions';
+  if (/rate[_ -]limit|too many requests|\b429\b/i.test(message)) return 'rate-limit';
+  if (/context.{0,20}(length|window)|token.limit/i.test(message)) return 'context-limit';
+  if (/unexpected argument|unrecognized.{0,20}(argument|option)|unknown option/i.test(message)) return 'cli-arguments';
+  return 'unknown';
+}
+
 export function retryAfterMs(message, now = Date.now()) {
   const seconds = message.match(/retry[-_ ]after["'\s:=]+(\d+(?:\.\d+)?)/i);
   if (seconds) return Math.ceil(Number(seconds[1]) * 1000);
@@ -150,6 +163,7 @@ export async function controlledRun({ config, readState, writeState, invoke, log
     await writeState(state);
     if (success) { log('Codex: completed'); return 0; }
     log(`Codex: ${kind} failure${result.tools ? ' after tool activity; automatic replay disabled' : ''}`);
+    log(`Codex: failure reason=${failureReason(result.error)}`);
     if (kind !== 'transient') return 1;
     if (result.tools || result.uncertain || result.signal || count === config.attempts) return 75;
   }

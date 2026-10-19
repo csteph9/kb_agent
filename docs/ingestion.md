@@ -182,7 +182,18 @@ The timer retries delivery independently of source polling, with exponential
 backoff and a five-attempt limit. Synced events are checked again daily, using
 their last observed source version. `status` includes calendar delivery status,
 event ID, attempts, sanitized error and last confirmed timestamp. Service logs
-record delivery outcomes without source payloads. To retry after fixing an issue:
+record delivery outcomes without source payloads.
+
+Unstructured extraction defaults to five documents per run, a 120-second model
+deadline per document and a 30-second shared execution queue wait. Override the
+batch size with `CALENDAR_EXTRACT_MAX_ITEMS_PER_RUN` and the model deadline with
+`CALENDAR_EXTRACT_TIMEOUT_SECONDS`. Each job makes one model attempt; the durable
+queue owns subsequent retries. A process failure stops that extraction batch,
+leaving the remaining jobs untouched. Logs show start/completion, event counts,
+and failure stage; controller failures expose fixed diagnostic codes such as
+`output-schema` and `workspace-trust`, without printing source text.
+
+To retry after fixing an issue:
 
 ```bash
 node ingest/cli.js calendar-retry knowledge-schedule

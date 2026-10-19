@@ -80,6 +80,10 @@ test('extraction invokes the shared controller with JSON events and a schema in 
   const result = await extractSchedule(source, item, [], { execute: async (command, args, options) => {
     assert.equal(command, 'bash');
     assert.ok(args.includes('--json'));
+    assert.ok(args.includes('--skip-git-repo-check'), 'temporary extraction workspace is outside Git');
+    assert.equal(options.env.CODEX_MAX_ATTEMPTS, '1');
+    assert.equal(options.env.CODEX_QUEUE_TIMEOUT_SECONDS, '30');
+    assert.ok(Number(options.env.CODEX_CALL_TIMEOUT_SECONDS) <= 3600);
     assert.equal(args[args.indexOf('--sandbox') + 1], 'read-only');
     const schema = JSON.parse(fs.readFileSync(args[args.indexOf('--output-schema') + 1], 'utf8'));
     assert.equal(schema.additionalProperties, false);
@@ -111,4 +115,41 @@ test('a correction from a different source document reuses the occurrence mappin
   assert.equal(state.status().calendar.length, 1);
   const payload = JSON.parse(state.db.prepare('SELECT payload FROM calendar_deliveries').get().payload);
   assert.equal(payload.content.structured.cancelled, true);
+});
+test('failed extractor processes expose a sanitized launch diagnostic and retain retry input', async t => {
+  const { state } = setup(t); state.enqueuePage(source, [item], null);
+  await extractCalendars([source], state, { extract: () => extractSchedule(source, item, [], {
+    execute: async () => ({ code: 1, stderr: 'private source content and credentials' })
+  }) });
+  const row = state.status().calendarExtractions[0];
+  assert.equal(row.status, 'retry');
+  assert.match(row.error, /process failed \(exit 1, reason unknown\)/);
+  assert.doesNotMatch(row.error, /private|credentials/);
+  assert.equal(state.status().calendar.length, 0);
+  assert.ok(state.db.prepare('SELECT payload FROM calendar_extractions').get().payload);
+});
+test('a systemic extractor failure stops the batch and leaves remaining jobs untouched', async t => {
+  const { state } = setup(t);
+  state.enqueuePage(source, [item, { ...item, externalId: 'another.md' }], null);
+  let calls = 0;
+  await extractCalendars([source], state, { extract: async () => {
+    calls++;
+    throw Object.assign(new Error('private raw provider output'), { code: 'CALENDAR_EXTRACT_LAUNCH', exitCode: 1, reason: 'output-schema' });
+  } });
+  assert.equal(calls, 1);
+  const rows = state.status().calendarExtractions;
+  assert.match(rows[0].error, /reason output-schema/);
+  assert.equal(rows[1].status, 'pending');
+  assert.equal(rows[1].attempts, 0);
+});
+test('disabled extraction queues cannot block eligible sources', async t => {
+  const { state } = setup(t);
+  const disabled = { ...source, id: 'disabled' };
+  state.enqueuePage(disabled, [item], null);
+  state.enqueuePage(source, [item], null);
+  let calls = 0;
+  await extractCalendars([{ ...disabled, enabled: false }, source], state, { limit: 1,
+    extract: async () => { calls++; return { events: [], issues: [] }; } });
+  assert.equal(calls, 1);
+  assert.equal(state.status().calendarExtractions.find(r => r.source === source.id).status, 'applied');
 });

@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import Ajv from 'ajv';
-import { appDir } from './config.js';
+import { appDir, positive } from './config.js';
 import { run } from './process.js';
 import { hash } from './state.js';
 
@@ -94,20 +94,34 @@ BEGIN UNTRUSTED SOURCE JSON
 ${JSON.stringify(item)}
 END UNTRUSTED SOURCE JSON`;
     const result = await execute('bash', [path.join(appDir, 'run-codex-call.sh'), '--knowledge-call-profile=bulk',
-      '-C', dir, 'exec', '--json', '--sandbox', 'read-only', '--output-schema', schema, '-o', output, '-'], { input: prompt, cwd: dir });
-    if (result.code !== 0) throw new Error('Schedule extraction failed');
+      '-C', dir, 'exec', '--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--output-schema', schema, '-o', output, '-'], {
+      input: prompt, cwd: dir, env: { ...process.env,
+        CODEX_CALL_TIMEOUT_SECONDS: String(positive(Number(process.env.CALENDAR_EXTRACT_TIMEOUT_SECONDS || 120), 120, 3600)),
+        CODEX_QUEUE_TIMEOUT_SECONDS: '30', CODEX_MAX_ATTEMPTS: '1' }
+    });
+    const reason = result.stderr?.match(/Codex: failure reason=(output-schema|workspace-trust|model-access|authentication|quota-or-permissions|rate-limit|context-limit|cli-arguments|unknown)\b/)?.[1] || 'unknown';
+    if (result.code !== 0) throw Object.assign(new Error('Schedule extractor process failed'), {
+      code: 'CALENDAR_EXTRACT_LAUNCH', exitCode: result.code, reason
+    });
     const stat = await fs.stat(output);
     if (stat.size > 1000000) throw new Error('Schedule extraction exceeds limit');
     return JSON.parse(await fs.readFile(output, 'utf8'));
   } finally { await fs.rm(dir, { recursive: true, force: true }); }
 }
 
-export async function extractCalendars(configured, state, { extract = extractSchedule, now = Date.now } = {}) {
+export async function extractCalendars(configured, state, { extract = extractSchedule, now = Date.now,
+  limit = positive(Number(process.env.CALENDAR_EXTRACT_MAX_ITEMS_PER_RUN || 5), 5, 100) } = {}) {
   let ok = true;
-  const rows = state.db.prepare("SELECT * FROM calendar_extractions WHERE status IN ('pending','retry') AND next_attempt<=? ORDER BY rowid LIMIT 20").all(now());
+  const eligible = configured.filter(s => s.enabled && s.calendarSync?.enabled).map(s => s.id);
+  if (!eligible.length) return true;
+  const rows = state.db.prepare(`SELECT * FROM calendar_extractions WHERE status IN ('pending','retry') AND next_attempt<=?
+    AND source IN (${eligible.map(() => '?').join(',')}) ORDER BY rowid LIMIT ?`).all(now(), ...eligible, limit);
   for (const row of rows) {
     const source = configured.find(s => s.id === row.source);
     if (!source?.enabled || !source.calendarSync?.enabled) continue;
+    let stage = 'process';
+    const job = hash(JSON.stringify([row.source, row.external_id])).slice(0, 12);
+    console.log(JSON.stringify({ component: 'calendar-extract', source: source.id, job, status: 'extracting' }));
     try {
       const item = JSON.parse(row.payload);
       const previous = state.db.prepare('SELECT payload FROM calendar_deliveries WHERE source=? AND target=? AND calendar=? ORDER BY rowid DESC LIMIT 500')
@@ -115,20 +129,35 @@ export async function extractCalendars(configured, state, { extract = extractSch
         .map(r => JSON.parse(r.payload)).filter(i => i._extractionId)
         .map(i => ({ id: i._extractionId, origin: i._originId, title: i.title, event: i.content.structured }));
       const output = await extract(source, item, previous);
+      stage = 'validation';
       const items = extractedItems(output, item, source.calendarSync);
+      stage = 'persistence';
       state.db.exec('BEGIN IMMEDIATE');
       try {
         for (const event of items) state.queueCalendar(source, event);
         state.db.prepare("UPDATE calendar_extractions SET status='applied',payload=NULL,error=NULL WHERE source=? AND external_id=?").run(source.id, row.external_id);
         state.db.exec('COMMIT');
       } catch (error) { state.db.exec('ROLLBACK'); throw error; }
-    } catch {
+      console.log(JSON.stringify({ component: 'calendar-extract', source: source.id, job, status: 'applied', events: items.length }));
+    } catch (error) {
       ok = false;
       const attempts = row.attempts + 1;
+      // Persist only application-generated diagnostics; provider output may
+      // contain private source text, authenticated URLs or credentials.
+      const launchFailed = error.code === 'CALENDAR_EXTRACT_LAUNCH' && Number.isInteger(error.exitCode);
+      const reasons = ['output-schema', 'workspace-trust', 'model-access', 'authentication', 'quota-or-permissions', 'rate-limit', 'context-limit', 'cli-arguments'];
+      const reason = reasons.includes(error.reason) ? error.reason : 'unknown';
+      const message = launchFailed
+        ? `Schedule extractor process failed (exit ${error.exitCode}, reason ${reason}); check Codex launch/configuration.`
+        : `Schedule ${stage} failed or requires review; inspect source dates, evidence and rule.`;
       state.db.prepare('UPDATE calendar_extractions SET status=?,attempts=?,next_attempt=?,error=? WHERE source=? AND external_id=?')
         .run(attempts >= 5 ? 'failed' : 'retry', attempts, now() + Math.min(86400000, 60000 * 2 ** attempts),
-          'Schedule extraction failed or requires review; inspect source dates, evidence and rule.', source.id, row.external_id);
-      console.error(JSON.stringify({ component: 'calendar-extract', source: source.id, status: attempts >= 5 ? 'failed' : 'retry', attempts }));
+          message, source.id, row.external_id);
+      console.error(JSON.stringify({ component: 'calendar-extract', source: source.id, job, status: attempts >= 5 ? 'failed' : 'retry', attempts,
+        stage, ...(launchFailed ? { exitCode: error.exitCode, reason } : {}) }));
+      // A broken CLI/schema/auth setup affects the whole batch. Leave the other
+      // jobs untouched instead of repeating the same expensive failing call.
+      if (launchFailed) break;
     }
   }
   return ok;

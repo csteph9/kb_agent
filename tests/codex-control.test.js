@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { controlledRun, settings, observeEvent, failureKind, retryAfterMs, userErrorMessage, callProfile, pinnedCodexArgs } from '../codex-control.js';
+import { controlledRun, settings, observeEvent, failureKind, failureReason, retryAfterMs, userErrorMessage, callProfile, pinnedCodexArgs } from '../codex-control.js';
+
+test('controller diagnostics classify failures without repeating provider content', () => {
+  assert.equal(failureReason('Invalid schema for response_format with private prompt text'), 'output-schema');
+  assert.equal(failureReason('Not inside a trusted directory; --skip-git-repo-check was not specified'), 'workspace-trust');
+  assert.equal(failureReason('unexpected argument --output-schema'), 'output-schema');
+  assert.equal(failureReason('unauthorized 401 with secret token'), 'authentication');
+  assert.equal(failureReason('private URL and unrecognized provider error'), 'unknown');
+});
 
 const ok = { code: 0, completed: true, error: '' };
 const busy = { code: 1, error: 'Model is at capacity' };
