@@ -24,6 +24,19 @@ export function validateSource(source) {
     if (typeof source[key] !== 'object' || Array.isArray(source[key])) throw new Error('Invalid ' + key + ' configuration');
   }
   if (source.owner !== undefined && typeof source.owner !== 'string') throw new Error('Invalid owner');
+  if (source.calendarSync !== undefined) {
+    const rule = source.calendarSync;
+    if (!rule || typeof rule !== 'object' || Array.isArray(rule) || typeof rule.enabled !== 'boolean' ||
+        !validId(rule.targetSourceId) || typeof rule.calendarId !== 'string' || !rule.calendarId.trim()) {
+      throw new Error('Invalid calendarSync configuration');
+    }
+    if (source.connector === 'google-calendar') throw new Error('Invalid calendarSync: Google ingestion cannot be mirrored back to Google');
+    if (rule.purpose !== undefined && typeof rule.purpose !== 'string') throw new Error('Invalid calendarSync purpose');
+    if (rule.titleIncludes !== undefined && (!Array.isArray(rule.titleIncludes) ||
+        rule.titleIncludes.some(s => typeof s !== 'string' || !s.trim()))) throw new Error('Invalid calendarSync titleIncludes');
+    if (rule.timeZone !== undefined && typeof rule.timeZone !== 'string') throw new Error('Invalid calendarSync timeZone');
+    if (rule.timeZone) { try { new Intl.DateTimeFormat('en', { timeZone: rule.timeZone }); } catch { throw new Error('Invalid calendarSync timeZone'); } }
+  }
   if (source.ingestion.purpose !== undefined && typeof source.ingestion.purpose !== 'string') throw new Error('Invalid ingestion purpose');
   source.schedule.everySeconds = positive(source.schedule.everySeconds, 600, 31536000);
   source.ingestion.maxItemsPerRun = positive(source.ingestion.maxItemsPerRun, 10, 1000);

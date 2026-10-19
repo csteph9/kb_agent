@@ -4,6 +4,9 @@ Ingestion runs through one backend pipeline:
 
 `source configuration → connector → durable jobs → knowledge writer → Git sync`
 
+Sources with standing calendar rules also enqueue independent extraction/delivery
+work: `source item → validated events → reconciliation queue → Google Calendar`.
+
 The knowledge repository uses Markdown + Git. Operational state is SQLite in
 `/opt/knowledge-agent/var/ingest/ingest.sqlite`, outside the KB. It is not a second
 knowledge database.
@@ -135,6 +138,86 @@ Agent writes are live Google API operations, separate from the ingestion queue.
 Creates use deterministic provider event IDs; updates/deletes require a current
 ETag; local configuration independently limits writable calendars and deletion.
 The next ingestion run reconciles successful Google changes into Markdown.
+
+## Automatic source-to-Google Calendar reconciliation
+
+Sources can now have a standing `calendarSync` rule. The existing ingestion
+timer queues delivery to Google Calendar without a chat request. ICS feeds use
+their structured events directly. Email, web, RSS and local KB documents go
+through a separate schema-constrained extraction queue, with validated dates,
+verbatim source evidence and stable event identities. Ambiguous extraction is
+retained for review and retry. The destination must be an enabled
+`google-calendar` source with `writeEnabled` and the calendar in its
+`writableCalendarIds`. A source owner labels context; it does not filter a shared
+feed by participant. Use a participant/team feed, or optional `titleIncludes`
+(an array of case-insensitive title substrings, matched with OR).
+
+`calendarSync.purpose` describes which appointments the extraction should include.
+`calendarSync.targetSourceId` selects the configured Google connection;
+`calendarId` selects its destination calendar; `timeZone` supplies an IANA zone
+for floating source times. Explicit event zones and UTC take precedence.
+These rules are standing authorization to keep matching source events current.
+Changes to mapped event titles continue updating their original destination.
+Disabling a rule stops writes and preserves destination events.
+
+Source ingestion atomically saves delivery work and advances its cursor. Calendar
+delivery and Markdown extraction have separate status and retries. Enabling a
+rule also backfills previously ingested events on the next source scan. Updates
+to rule settings are picked up on that scan without re-extracting Markdown.
+Source/external event identities determine provider IDs across retries, including
+recovery after Google accepts a create but its response is lost. Only events with
+the worker's matching private ownership marker can be updated or deleted. A
+possible pre-existing event in the same date window is held for review rather
+than duplicated or silently adopted. Review existing manual entries when first
+enabling a rule; the worker does not claim ownership of them.
+
+Delivery checks current ETags before mutations, suppresses attendee notifications,
+and never copies attendees. Explicit source cancellation deletes only its owned
+event when destination `allowDelete` is enabled. Disappearance from a feed never
+causes deletion. Source-managed fields (title, description, location and times)
+are authoritative and may replace destination edits. Destination tombstones are
+held for review; deleted Google IDs are not blindly recreated.
+
+The timer retries delivery independently of source polling, with exponential
+backoff and a five-attempt limit. Synced events are checked again daily, using
+their last observed source version. `status` includes calendar delivery status,
+event ID, attempts, sanitized error and last confirmed timestamp. Service logs
+record delivery outcomes without source payloads. To retry after fixing an issue:
+
+```bash
+node ingest/cli.js calendar-retry knowledge-schedule
+node ingest/cli.js calendar-sync
+node ingest/cli.js status
+```
+
+This path currently supports standalone events, all-day events, UTC and IANA
+time zones. Recurring series, recurrence exceptions, custom VTIMEZONE identifiers,
+and ambiguous/missing times are held for review rather than flattened or guessed.
+For any Markdown updates, including the bot's KB-discovered morning refresh,
+copy `knowledge-schedule.example.json` to `knowledge-schedule.json`, select
+destination/timezone/purpose and optional relative `config.paths`, then enable
+the source and rule. The connector reads `KNOWLEDGE_REPO` (or `config.root`),
+skips hidden files and AGENTS.md, rejects symlinks/path escapes, and detects
+changed Markdown by content hash. It does not re-ingest documents into the KB.
+Thus refreshed schedules, manual KB edits and schedules captured by other
+integrations enter the same durable extraction and delivery path. Deleting a
+document does not delete Google events. The configured polling interval bounds
+the delay; no chat message is necessary.
+
+Choose one synchronization route for each schedule: direct source rules or the
+KB watcher. Mirroring the same appointments through both paths can produce
+duplicate-review holds. Source IDs and extracted event IDs are part of identity;
+recreating a source needs review. Extraction receives up to 500 prior event
+identities for that source/destination so corrections and cancellations in later
+messages or different KB documents can update the same occurrence. Ambiguous
+identity matches are held for review. For
+unstructured sources, extraction uses the configured Codex model and incurs model
+usage only when content/rules change or extraction retries. Evidence/schema
+validation reduces errors but cannot prove semantic correctness; inspect initial
+sync results for each new rule. Scope KB paths/purpose to appointments you want
+published. Pending extraction retains input until success or manual resolution.
+Calendar delivery retains event payloads and identity mappings for ongoing sync.
+No live source credentials or private URLs are shipped with the application.
 
 RSS accepts an RSS or Atom `url`. Calendar accepts an ICS `url`. Website accepts
 a single public HTML/text/XML/JSON `url` and optional `title`. Website is a

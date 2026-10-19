@@ -7,13 +7,15 @@ import { State } from './state.js';
 import { loadConnector } from './registry.js';
 import { syncKnowledge } from './knowledge-writer.js';
 import { runSource } from './runner.js';
+import { reconcileCalendars } from './calendar-sync.js';
+import { extractCalendars } from './calendar-extract.js';
 
 process.umask(0o077);
 const [command = 'help', argument] = process.argv.slice(2);
-const mutations = ['run', 'due', 'retry', 'refetch', 'migrate-gmail', 'check', 'sync'];
+const mutations = ['run', 'due', 'retry', 'refetch', 'migrate-gmail', 'check', 'sync', 'calendar-sync', 'calendar-retry'];
 async function main() {
   if (command === 'help') {
-    console.log('Usage: node ingest/cli.js sources | check <source> | run <source> | due | status | sync | retry <job-id> | refetch <source> | migrate-gmail [source-id]');
+    console.log('Usage: node ingest/cli.js sources | check <source> | run <source> | due | status | sync | calendar-sync | calendar-retry <source> | retry <job-id> | refetch <source> | migrate-gmail [source-id]');
     return;
   }
   await fs.mkdir(stateDir, { recursive: true, mode: 0o700 });
@@ -27,7 +29,23 @@ async function main() {
   }
   const configured = await sources();
   const state = new State(stateDir);
+  async function calendarWork() {
+    const extracted = await extractCalendars(configured, state);
+    const delivered = await reconcileCalendars(configured, state);
+    return extracted && delivered;
+  }
   try {
+    if (command === 'calendar-retry') {
+      if (!configured.some(s => s.id === argument)) throw new Error('Unknown source');
+      state.db.prepare("UPDATE calendar_deliveries SET status='pending',attempts=0,next_attempt=0,error=NULL WHERE source=? AND status IN ('retry','failed')").run(argument);
+      state.db.prepare("UPDATE calendar_extractions SET status='pending',attempts=0,next_attempt=0,error=NULL WHERE source=? AND status IN ('retry','failed')").run(argument);
+      if (!(await calendarWork())) process.exitCode = 1;
+      return;
+    }
+    if (command === 'calendar-sync') {
+      if (!(await calendarWork())) process.exitCode = 1;
+      return;
+    }
     if (command === 'sources') { console.log(JSON.stringify(configured.map(s => ({id:s.id,connector:s.connector,enabled:s.enabled,everySeconds:s.schedule.everySeconds})), null, 2)); return; }
     if (command === 'status') { console.log(JSON.stringify(state.status(), null, 2)); return; }
     if (command === 'migrate-gmail') {
@@ -64,6 +82,7 @@ async function main() {
       for (const source of configured.filter(s => s.enabled && Date.now() - state.source(s.id).last_run >= s.schedule.everySeconds * 1000)) {
         if (!(await runSource(source, state))) process.exitCode = 1;
       }
+      if (!(await calendarWork())) process.exitCode = 1;
       if (state.status().syncPending) {
         if (await syncKnowledge()) state.db.prepare('UPDATE jobs SET sync_pending=0').run();
         else { console.error('Remote synchronization remains pending.'); process.exitCode = 1; }
@@ -79,6 +98,7 @@ async function main() {
       finally { await connector.close?.(); }
     } else if (['run', 'retry'].includes(command)) {
       if (!(await runSource(source, state))) process.exitCode = 1;
+      if (!(await calendarWork())) process.exitCode = 1;
     } else if (command === 'refetch') {
       state.refetch(source.id);
       console.log('Reset scan cursor and expired jobs. Applied items remain deduplicated.');

@@ -5,6 +5,12 @@ website connectors, configured sources, one generic timer, durable retries and
 shared knowledge writes. See [the ingestion guide](docs/ingestion.md) for the
 connector contract, source examples and operational details.
 
+Automatic Google Calendar synchronization can run from source feeds or changed
+KB schedules. Configure a standing `calendarSync` rule once; the ingestion timer
+then extracts events, delivers changes and retries failures without chat prompts.
+See [automatic calendar reconciliation](docs/ingestion.md#automatic-source-to-google-calendar-reconciliation)
+and [the KB schedule source example](config/sources/knowledge-schedule.example.json).
+
 **Existing KB server:** deploy from a separate application checkout with
 `sudo bash deploy-ingest.sh`. The script migrates Gmail state, preserves OAuth
 files and source configuration, and switches the ingestion timer. Telegram and

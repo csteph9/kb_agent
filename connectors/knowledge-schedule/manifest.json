@@ -1,0 +1,1 @@
+{"id":"knowledge-schedule","apiVersion":1,"description":"Read Markdown schedule updates from the local knowledge repository","capabilities":["poll","manual"],"configSchema":{"type":"object","additionalProperties":false,"properties":{"root":{"type":"string"},"paths":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}}}}}

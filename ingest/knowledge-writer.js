@@ -30,6 +30,7 @@ export function buildPrompt(source, item) {
   ].join('\n\n');
 }
 export async function writeKnowledge(source, job) {
+  if (source.connector === 'knowledge-schedule') return { syncPending: false };
   const item = JSON.parse(job.payload);
   if (item.skipReason) return { syncPending: false };
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'knowledge-ingest-'));

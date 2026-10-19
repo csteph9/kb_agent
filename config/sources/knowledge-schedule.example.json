@@ -1,0 +1,15 @@
+{
+  "id": "knowledge-schedule",
+  "connector": "knowledge-schedule",
+  "enabled": false,
+  "config": { "paths": ["."] },
+  "calendarSync": {
+    "enabled": false,
+    "targetSourceId": "personal-google-calendar",
+    "calendarId": "primary",
+    "timeZone": "Etc/UTC",
+    "purpose": "Synchronize concrete personal and household appointments from the knowledge base. Exclude historical, tentative, and unrelated public events."
+  },
+  "schedule": { "everySeconds": 600 },
+  "ingestion": { "profile": "calendar", "maxItemsPerRun": 20, "maxItemChars": 200000 }
+}

@@ -39,7 +39,7 @@ export async function runSource(source, state, { load = loadConnector, write = w
     for (let page = 0; page < source.ingestion.maxPagesPerRun && processed < max; page++) {
       const result = await connector.fetchPage({
         cursor, limit: max - processed,
-        has: (id, revision) => state.has(source.id, id, revision)
+        has: (id, revision) => state.has(source.id, id, revision) && state.calendarHas(source, id, revision)
       });
       if (!Array.isArray(result.items) || result.items.length > max - processed) throw new Error('Connector exceeded page limit');
       const items = result.items.map(item => normalize(source, item));
