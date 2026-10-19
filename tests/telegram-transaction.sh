@@ -90,11 +90,15 @@ set -e
 [[ "$code" == 2 ]]
 assert_clean
 export TEST_PUSH_FAILURE=0
-# Preserve unrelated edits; refuse without calling the model.
+# Reads see committed data even when an unrelated manual edit exists.
 echo 'Manual edit' >"$KNOWLEDGE_REPO/manual.md"
 before="$(wc -l <"$TEST_COUNTER")"
-set +e
 run READ
+[[ "$(cat "$KNOWLEDGE_REPO/manual.md")" == 'Manual edit' ]]
+# Writes still preserve dirty checkouts and refuse without calling the model.
+before="$(wc -l <"$TEST_COUNTER")"
+set +e
+run WRITE
 code=$?
 set -e
 [[ "$code" == 73 && "$(cat "$KNOWLEDGE_REPO/manual.md")" == 'Manual edit' ]]

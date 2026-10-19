@@ -52,7 +52,7 @@ export function userErrorMessage(error) {
 export function relayCodexProgress(stream, log = console.log) {
   const lines = createInterface({ input: stream });
   lines.on('line', line => {
-    if (/^(Codex: (waiting for shared execution slot|execution queue busy; try again later|cooldown exceeds this request budget; deferred|pacing wait \d+s|starting attempt \d+\/\d+|completed|(?:transient|permanent|unknown) failure(?: after tool activity; automatic replay disabled)?)|Telegram: (running (?:READ|WRITE) request in temporary worktree|request failed; unfinished worktree edits discarded|(?:READ|WRITE) transaction complete))$/.test(line)) log(line);
+    if (/^(Codex: (waiting for (?:shared|interactive) execution slot|execution queue busy; try again later|cooldown exceeds this request budget; deferred|pacing wait \d+s|starting attempt \d+\/\d+|completed|(?:transient|permanent|unknown) failure(?: after tool activity; automatic replay disabled)?)|Telegram: (running (?:READ|WRITE) request in temporary worktree|request failed; unfinished worktree edits discarded|(?:READ|WRITE) transaction complete))$/.test(line)) log(line);
   });
 }
 
@@ -118,9 +118,10 @@ export function pinnedCodexArgs(args, profile = 'bulk') {
   ];
 }
 
-async function attempt(args, prompt, output) {
+async function attempt(args, prompt, output, live = false) {
   const state = { completed: false, failed: false, tools: false, error: '', uncertain: false };
   const child = spawn('codex', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+  if (live) child.stdout.on('data', chunk => process.stdout.write(chunk));
   let stderr = '';
   child.stderr.on('data', data => { stderr = (stderr + data).slice(-16000); });
   child.stdin.on('error', () => {});
@@ -195,11 +196,11 @@ async function main() {
         await fs.rename(stateFile + '.tmp', stateFile);
       },
       // Pin every application-owned call, including resumed sessions.
-      invoke: () => attempt(pinnedCodexArgs(args, selected.profile), prompt, output),
+      invoke: () => attempt(pinnedCodexArgs(args, selected.profile), prompt, output, selected.profile === 'answer'),
       log: message => console.error(message),
     });
     // Earlier thread.started events must not become the saved session ID.
-    if (code === 0) await pipeline(createReadStream(output), process.stdout);
+    if (code === 0 && selected.profile !== 'answer') await pipeline(createReadStream(output), process.stdout);
     process.exitCode = code;
   } finally { await fs.rm(temp, { recursive: true, force: true }); }
 }

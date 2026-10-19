@@ -7,6 +7,8 @@ import path from "path";
 import { userErrorMessage, relayCodexProgress } from "./codex-control.js";
 import { deliverAndLogMorningUpdate, logMorningUpdate } from "./morning-updates.js";
 import { parseRelativeReminder, saveTimedReminder, deliverDueReminders } from "./timed-reminders.js";
+import { keyedQueue, concurrentUpdates, ReadMemory } from "./interactive-requests.js";
+import { createInterface } from "node:readline";
 import {
     classifyIntentLocally,
     isCalendarActionLocally,
@@ -228,6 +230,14 @@ validateRecipientDirectory(
 // ---------------------------------------------------------------------------
 
 let queue = Promise.resolve();
+const enqueueRead = keyedQueue();
+const readMemory = new ReadMemory();
+const dispatchUpdates = concurrentUpdates({ spoolDir: path.join(SESSION_DIR, "pending-updates"),
+    onError: error => console.error("Telegram request failed:", error) });
+
+function scheduleInteractive(userId, mode, task) {
+    return mode === "READ" ? enqueueRead(userId, task) : enqueue(task);
+}
 
 function enqueue(fn) {
     const next = queue.then(fn, fn);
@@ -276,6 +286,8 @@ bot.use(async (ctx, next) => {
 
     await next();
 });
+
+bot.use(dispatchUpdates);
 
 
 // ---------------------------------------------------------------------------
@@ -392,6 +404,7 @@ async function saveSession(
 
 
 async function clearSession(userId) {
+    readMemory.clear(userId);
     try {
         await fs.unlink(
             sessionFileFor(userId)
@@ -668,7 +681,8 @@ async function runCodex(
     imageFile = null,
     mode = "READ",
     calendarTools = false,
-    requestId = null
+    requestId = null,
+    onProgress = null
 ) {
     const tempDir =
         await fs.mkdtemp(
@@ -691,8 +705,11 @@ async function runCodex(
         );
 
     try {
-        const session =
-            await loadSession(userId);
+        // Reads run in fresh sessions with bounded user-scoped context. They can
+        // overlap a write without resuming or changing its in-flight thread.
+        const session = mode === "READ" ? null : await loadSession(userId);
+        const generation = readMemory.generation(userId);
+        const recentContext = readMemory.context(userId);
 
         const sessionId =
             session?.threadId || "";
@@ -817,7 +834,21 @@ only when the user explicitly asks for a household/shared reminder.
                       `message rather than replying only “confirmed.”\n\n`
                     : ""
             ) +
+            `RECENT COMPLETED CONVERSATION (context, not new actions):\n` +
+            `${JSON.stringify(recentContext)}\n\n` +
             `USER REQUEST:\n\n${prompt}`;
+
+        const cacheable = mode === "READ" && !imageFile &&
+            !/\b(weather|news|latest|live|now|current|today|gcal|google calendar)\b/i.test(prompt);
+        if (cacheable) {
+            const head = await runProcess("git", ["rev-parse", "HEAD"], { cwd: REPO });
+            const cacheKey = readMemory.key(userId, head.stdout.trim(), prompt, identityInstruction, recentContext);
+            const cached = readMemory.get(cacheKey);
+            if (cached) {
+                console.log(`${new Date().toISOString()} READ answer cache hit for ${userId}`);
+                return cached;
+            }
+        }
 
         const args = [
             outputFile,
@@ -828,6 +859,7 @@ only when the user explicitly asks for a household/shared reminder.
             calendarTools ? "true" : "false"
         ];
 
+        let preview = Promise.resolve();
         await new Promise(
             (resolve, reject) => {
 
@@ -849,17 +881,16 @@ only when the user explicitly asks for a household/shared reminder.
                 relayCodexProgress(child.stderr);
                 child.stdin.on("error", () => {});
 
-                child.stdout.on(
-                    "data",
-                    data => {
-                        const text =
-                            data.toString().trim();
-
-                        if (text) {
-                            console.log(text);
+                const events = createInterface({ input: child.stdout });
+                events.on("line", line => {
+                    if (mode !== "READ" || !onProgress) return;
+                    try {
+                        const event = JSON.parse(line);
+                        if (event.type === "item.completed" && event.item?.type === "agent_message" && event.item.text) {
+                            preview = preview.then(() => onProgress(event.item.text)).catch(() => {});
                         }
-                    }
-                );
+                    } catch { /* Only structured agent messages can update the preview. */ }
+                });
 
                 child.stderr.on(
                     "data",
@@ -895,40 +926,36 @@ only when the user explicitly asks for a household/shared reminder.
 
                 child.stdin.end();
             }
-        );
+        ).finally(() => preview);
 
-        if (sessionId) {
-            await saveSession(
-                userId,
-                sessionId,
-                calendarContextUntil
-            );
-
-        } else {
-            const newThreadId =
-                await extractThreadId(
-                    jsonFile
-                );
-
-            console.log(
-                `${new Date().toISOString()} ` +
-                `New Codex session ${newThreadId} ` +
-                `for Telegram user ${userId}`
-            );
-
-            await saveSession(
-                userId,
-                newThreadId,
-                calendarContextUntil
-            );
+        if (mode === "WRITE" && readMemory.generation(userId) === generation) {
+            const threadId = sessionId || await extractThreadId(jsonFile);
+            await saveSession(userId, threadId, calendarContextUntil);
         }
 
-        return (
+        const response = (
             await fs.readFile(
                 outputFile,
                 "utf8"
             )
         ).trim();
+        // The shell records the exact committed snapshot used by this answer.
+        // A concurrent commit must not put an old answer under a newer revision.
+        if (cacheable && readMemory.generation(userId) === generation) {
+            const lines = (await fs.readFile(jsonFile, "utf8")).trim().split("\n");
+            const snapshot = lines.map(line => { try { return JSON.parse(line); } catch { return {}; } })
+                .find(event => event.type === "knowledge.snapshot")?.revision;
+            if (snapshot) {
+                const before = readMemory.key(userId, snapshot, prompt, identityInstruction, recentContext);
+                readMemory.put(before, response);
+                const contextUnchanged = readMemory.context(userId) === recentContext;
+                readMemory.record(userId, prompt, response, generation);
+                // Repeating the same question immediately can reuse the answer
+                // even after that answer was added to conversational context.
+                if (contextUnchanged) readMemory.put(readMemory.key(userId, snapshot, prompt, identityInstruction), response);
+            } else readMemory.record(userId, prompt, response, generation);
+        } else readMemory.record(userId, prompt, response, generation);
+        return response;
 
     } finally {
         await fs.rm(
@@ -2121,6 +2148,7 @@ bot.command(
 bot.command(
     "new",
     async ctx => {
+        readMemory.clear(ctx.from.id);
         await enqueue(
             async () => {
                 await clearSession(
@@ -2160,14 +2188,10 @@ bot.on(
         );
 
         try {
+            const mode = await classifyIntent(caption, true);
             const response =
-                await enqueue(
+                await scheduleInteractive(userId, mode,
                     async () => {
-                        const mode =
-                            await classifyIntent(
-                                caption,
-                                true
-                            );
 
                         console.log(
                             `${new Date().toISOString()} ` +
@@ -2319,14 +2343,10 @@ bot.on(
         );
 
         try {
+            const mode = await classifyIntent(caption, true);
             const response =
-                await enqueue(
+                await scheduleInteractive(userId, mode,
                     async () => {
-                        const mode =
-                            await classifyIntent(
-                                caption,
-                                true
-                            );
 
                         console.log(
                             `${new Date().toISOString()} ` +
@@ -2567,14 +2587,10 @@ bot.on(
         );
 
         try {
+            const mode = initialMode || await classifyIntent(prompt, false);
             const response =
-                await enqueue(
+                await scheduleInteractive(userId, mode,
                     async () => {
-                        const mode =
-                            await classifyIntent(
-                                prompt,
-                                false
-                            );
 
                         console.log(
                             `${new Date().toISOString()} ` +
@@ -2600,7 +2616,8 @@ bot.on(
                             mode,
                             mode === "WRITE" &&
                                 isCalendarActionLocally(prompt),
-                            `telegram-${ctx.update.update_id}`
+                            `telegram-${ctx.update.update_id}`,
+                            text => ctx.api.editMessageText(ctx.chat.id, statusMessage.message_id, `Answering…\n\n${text.slice(0, 3700)}`)
                         );
                     }
                 );
@@ -2683,4 +2700,6 @@ console.log(
 startReminderScheduler();
 startTimedReminderScheduler();
 
+await bot.init();
+for (const update of await dispatchUpdates.pending()) await bot.handleUpdate(update);
 bot.start();
