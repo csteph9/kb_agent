@@ -11,6 +11,9 @@ IMAGE="${3:-}"
 JSON_OUTPUT="${4:?JSON output file required}"
 MODE="${5:-READ}"
 CALENDAR_TOOLS="${6:-false}"
+PURPOSE="${7:-interactive}"
+[[ "$PURPOSE" == interactive || "$PURPOSE" == morning ]] || { echo 'Invalid request purpose' >&2; exit 64; }
+[[ "$PURPOSE" != morning || "$MODE" == READ ]] || { echo 'Morning reports require READ mode' >&2; exit 64; }
 [[ "$MODE" == READ || "$MODE" == WRITE ]] || { echo 'Invalid request mode' >&2; exit 64; }
 [[ "$CALENDAR_TOOLS" == true || "$CALENDAR_TOOLS" == false ]] || { echo 'Invalid calendar tool mode' >&2; exit 64; }
 [[ "$MODE" != READ || "$CALENDAR_TOOLS" == false ]] || { echo 'Calendar mutation tools are not available in READ mode' >&2; exit 64; }
@@ -52,6 +55,17 @@ PROFILE=bulk
 SANDBOX=workspace-write
 [[ "$MODE" != READ ]] || SANDBOX=read-only
 ARGS=("--knowledge-call-profile=$PROFILE" -C "$WORK" -c "sandbox_mode=\"$SANDBOX\"" -c 'sandbox_workspace_write.writable_roots=[]' exec)
+if [[ "$PURPOSE" == morning ]]; then
+  # The HTTP bridge exchanges request/response files here. The KB remains a
+  # disposable archive: no report edits are ever merged into the live checkout.
+  mkdir -p /tmp/knowledge-http/requests /tmp/knowledge-http/responses
+  ARGS=(--knowledge-call-profile=bulk -C "$WORK"
+    -c 'sandbox_mode="workspace-write"'
+    -c 'sandbox_workspace_write.writable_roots=["/tmp/knowledge-http"]'
+    -c 'sandbox_workspace_write.network_access=false'
+    -c 'sandbox_workspace_write.exclude_tmpdir_env_var=true'
+    -c 'sandbox_workspace_write.exclude_slash_tmp=true' exec)
+fi
 if [[ "$CALENDAR_TOOLS" == true ]]; then
   ARGS=(
     -c 'mcp_servers.knowledge-gcal.command="/opt/knowledge-agent/gcal-mcp.sh"'

@@ -19,9 +19,9 @@ export PATH="$TEMP/bin:$PATH"
 cat >"$TEMP/bin/codex" <<'MOCK'
 #!/bin/bash
 set -euo pipefail
-output='' sandbox='' resume=false
+output='' sandbox='' roots='' resume=false
 while [[ $# -gt 0 ]]; do
-  case "$1" in -C) shift; cd "$1" ;; -o) shift; output="$1" ;; -c) shift; [[ "$1" != sandbox_mode=* ]] || sandbox="$1" ;; resume) resume=true ;; esac
+  case "$1" in -C) shift; cd "$1" ;; -o) shift; output="$1" ;; -c) shift; [[ "$1" != sandbox_mode=* ]] || sandbox="$1"; [[ "$1" != sandbox_workspace_write.writable_roots=* ]] || roots="$1" ;; resume) resume=true ;; esac
   shift
 done
 cat >"$TEST_FAST/prompt"
@@ -30,7 +30,15 @@ if [[ "${BLOCK_BULK:-0}" == 1 ]]; then
   touch "$TEST_FAST/bulk-started"
   while [[ ! -f "$TEST_FAST/release" ]]; do sleep 0.05; done
 else
-  [[ "$sandbox" == 'sandbox_mode="read-only"' && "$resume" == false ]]
+  [[ "$resume" == false ]]
+  if [[ "${MORNING_REPORT:-0}" == 1 ]]; then
+    [[ "$sandbox" == 'sandbox_mode="workspace-write"' ]]
+    [[ "$roots" == 'sandbox_workspace_write.writable_roots=["/tmp/knowledge-http"]' ]]
+    [[ "$CODEX_CONTROL_DIR" != */interactive ]]
+    [[ "$CODEX_CALL_TIMEOUT_SECONDS" == 30 ]]
+  else
+    [[ "$sandbox" == 'sandbox_mode="read-only"' ]]
+  fi
   [[ "$PWD" != "$KNOWLEDGE_REPO" && ! -e .git && ! -e manual.md ]]
   [[ "$(cat fact.md)" == 'Coach: Alex.' ]]
   grep -q 'BEGIN RETRIEVED KB JSON' "$TEST_FAST/prompt"
@@ -87,4 +95,11 @@ done
 grep -q agent_message "$TEMP/preview"
 [[ ! -f "$TEMP/stream-answer" ]]
 touch "$TEMP/stream-release"; wait "$stream"; stream=''
+# Morning reports need bridge file access and the background time budget,
+# while still discarding snapshot edits and never resuming a write thread.
+MORNING_REPORT=1 CODEX_CALL_TIMEOUT_SECONDS=30 bash "$APP/run-codex.sh" "$TEMP/morning-answer" 'old-thread' '' "$TEMP/morning-events" READ false morning <<<'USER REQUEST: Morning weather and news'
+[[ "$(cat "$TEMP/morning-answer")" == 'Coach: Alex.' ]]
+[[ "$(cat "$KNOWLEDGE_REPO/fact.md")" == 'Coach: Alex.' ]]
+[[ "$(cat "$KNOWLEDGE_REPO/manual.md")" == uncommitted ]]
+grep -q 'knowledge.snapshot' "$TEMP/morning-events"
 echo 'Fast reads bypass bulk/repository locks and stream previews'

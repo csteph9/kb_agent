@@ -78,6 +78,12 @@ answer while a write is running, including when the live checkout is dirty.
 They see the last committed revision, not unfinished edits. The CLI uses a
 read-only sandbox, a fresh ephemeral session and no Calendar mutation tools.
 
+Scheduled morning briefings pass the `morning` purpose to `run-codex.sh` and
+use the bulk lane and its longer call budget. Their sandbox allows writes to
+the disposable snapshot and `/tmp/knowledge-http`, so the HTTP bridge can
+retrieve weather and RSS feeds. Direct network access remains disabled and
+snapshot edits are discarded. The live KB is never a writable sandbox root.
+
 `read-context.js` builds a local passage index keyed by commit revision and
 prepends ranked passages with KB paths/line numbers. The complete snapshot and
 policy files remain available for broader searches when retrieval is insufficient.
